@@ -1,0 +1,83 @@
+{
+  "projectContext": {
+    "description": "A C2C campus marketplace named 'Shiwu'. The backend is a Java/Servlet REST API, and the frontend is a React+TypeScript SPA. The project strictly follows the rules defined in PROJECT_GUIDELINES.md, CODING_STANDARDS.md, and this file.",
+    "techStack": [
+      "Java (Servlet API)",
+      "React (TypeScript)",
+      "MySQL",
+      "SLF4J",
+      "JDBC",
+      "Mockito"
+    ]
+  },
+  "rules": [
+    {
+      "scope": "java,java-service",
+      "instructions": [
+        "**STRICTEST COMMAND: NO CROSS-MODULE MODIFICATION.** This is the most critical rule. Cross-functional module programming is **STRICTLY FORBIDDEN**.",
+        "**Module Isolation Principle**: A service from one module (e.g., `OrderService`) **MUST NOT** directly call a DAO from another module (e.g., `UserDao`, `ProductDao`). All interactions between modules must occur through well-defined public service interfaces (e.g., `OrderService` must call a method on `UserService` to get user data).",
+        "**Data Ownership Principle**: Each service is the sole owner of its domain's data. For example, `CartService` is **FORBIDDEN** from directly modifying product stock levels. It **MUST** call a dedicated method on `ProductService`, such as `decreaseStock()`.",
+        "**Single Responsibility Principle**: The login module, cart module, product module, and order module must remain completely independent of each other's internal implementation details. Do not mix logic from different domains in one service.",
+        "**Horizontal Permission Checks**: In every service method that accesses user-specific data, you **MUST** include the current user's ID as a parameter and verify they are authorized to access the requested resource (e.g., `getOrderDetail(long orderId, long currentUserId)` must check if `currentUserId` is the buyer or seller)."
+      ]
+    },
+    {
+      "scope": "global",
+      "instructions": [
+        "**Source of Truth**: All generated code must strictly adhere to the project's context documents (SRS, Design Docs, Guidelines).",
+        "**API Response Format**: All backend endpoints must return the unified JSON structure. Success: `{ \"success\": true, \"data\": { ... } }`. Failure: `{ \"success\": false, \"error\": { ... } }`."
+      ]
+    },
+    {
+      "scope": "java,java-pojo",
+      "instructions": [
+        "**Data Types**: All properties in DO, DTO, and VO classes **MUST** use wrapper types (e.g., `Integer`, `Long`), not primitives.",
+        "**Boolean Naming**: Boolean properties in POJOs **MUST NOT** have an `is` prefix (e.g., `private Boolean deleted;`). The database column, however, should be `is_deleted`.",
+        "**No Business Logic**: POJOs are for data only. **FORBIDDEN** to have business logic in constructors, getters, or setters."
+      ]
+    },
+    {
+      "scope": "java,java-logging",
+      "instructions": [
+        "**API**: Use SLF4J only.",
+        "**Format**: Use `{}` placeholders for variables. **Never** use string concatenation.",
+        "**Exception Logging**: Always pass the exception object as the last argument to the logger to print the full stack trace: `logger.error(\"Error processing request: {}\", params, e);`.",
+        "**Level Guards**: Use level checks (`if (logger.isDebugEnabled())`) for debug/trace logs to avoid performance overhead."
+      ]
+    },
+    {
+      "scope": "java,java-concurrency",
+      "instructions": [
+        "**Thread Pools**: **FORBIDDEN** to use `Executors`. Create thread pools directly with `ThreadPoolExecutor`.",
+        "**SimpleDateFormat**: **FORBIDDEN**. Use thread-safe `java.time` classes like `LocalDateTime` and `DateTimeFormatter` instead.",
+        "**Locks**: The `lock()` call must be placed outside the `try` block, and `unlock()` must be in the `finally` block."
+      ]
+    },
+    {
+      "scope": "sql,mysql",
+      "instructions": [
+        "**Naming**: All table and column names **MUST** be lowercase_snake_case. Table names **MUST** be singular (e.g., `trade_order`).",
+        "**Mandatory Columns**: All tables **MUST** have `id` (PK, bigint unsigned), `create_time` (datetime), and `update_time` (datetime).",
+        "**Logical Deletes**: All tables **MUST** use an `is_deleted` (tinyint) column. All SELECT queries must default to `WHERE is_deleted = 0`.",
+        "**Querying**: **FORBIDDEN** to use `SELECT *`. Always explicitly list the required columns.",
+        "**Foreign Keys**: **FORBIDDEN** to use physical foreign key constraints. Manage relationships in the application layer."
+      ]
+    },
+    {
+      "scope": "java,unit-test",
+      "instructions": [
+        "**AIR Principles**: Tests must be Automatic, Independent, and Repeatable.",
+        "**Assertions**: **MANDATORY** to use an assertion library (e.g., JUnit 5 Assertions). **FORBIDDEN** to use `System.out.println` for verification.",
+        "**Mocking**: **MANDATORY** to use a mocking framework (like Mockito) to simulate all external dependencies (other services, DAOs, etc.)."
+      ]
+    },
+    {
+      "scope": "typescript,tsx,react",
+      "instructions": [
+        "**API Services**: Encapsulate all API calls in a dedicated service layer (e.g., `src/services/product.service.ts`).",
+        "**Type Safety**: Create TypeScript `interface` or `type` definitions for all API responses (VOs).",
+        "**Security**: Sanitize all user-generated content rendered as HTML using a library like `DOMPurify` to prevent XSS attacks."
+      ]
+    }
+  ]
+}
