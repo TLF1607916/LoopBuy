@@ -2,9 +2,7 @@ package com.shiwu.user.controller;
 
 import com.shiwu.common.result.Result;
 import com.shiwu.common.util.JsonUtil;
-import com.shiwu.user.model.LoginErrorEnum;
-import com.shiwu.user.model.LoginRequest;
-import com.shiwu.user.model.LoginResult;
+import com.shiwu.user.model.*;
 import com.shiwu.user.service.UserService;
 import com.shiwu.user.service.impl.UserServiceImpl;
 import org.slf4j.Logger;
@@ -40,11 +38,15 @@ public class UserController extends HttpServlet {
             return;
         }
 
-        // 处理登录请求
-        if ("/login".equals(pathInfo)) {
-            handleLogin(req, resp);
-        } else {
-            sendErrorResponse(resp, "404", "请求路径不存在");
+        switch (pathInfo) {
+            case "/login":
+                handleLogin(req, resp);
+                break;
+            case "/register":
+                handleRegister(req, resp);
+                break;
+            default:
+                sendErrorResponse(resp, "404", "请求路径不存在");
         }
     }
 
@@ -80,6 +82,41 @@ public class UserController extends HttpServlet {
         } catch (Exception e) {
             logger.error("处理登录请求失败: {}", e.getMessage(), e);
             sendErrorResponse(resp, LoginErrorEnum.SYSTEM_ERROR.getCode(), LoginErrorEnum.SYSTEM_ERROR.getMessage());
+        }
+    }
+    
+    /**
+     * 处理注册请求
+     */
+    private void handleRegister(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        try {
+            // 读取请求体
+            BufferedReader reader = req.getReader();
+            StringBuilder requestBody = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                requestBody.append(line);
+            }
+
+            // 解析JSON请求
+            RegisterRequest registerRequest = JsonUtil.fromJson(requestBody.toString(), RegisterRequest.class);
+            if (registerRequest == null || registerRequest.getUsername() == null || registerRequest.getPassword() == null) {
+                sendErrorResponse(resp, RegisterErrorEnum.PARAMETER_ERROR.getCode(), RegisterErrorEnum.PARAMETER_ERROR.getMessage());
+                return;
+            }
+
+            // 调用服务进行注册
+            RegisterResult registerResult = userService.register(registerRequest);
+            
+            // 返回结果
+            if (registerResult.getSuccess()) {
+                sendSuccessResponse(resp, registerResult.getUserVO());
+            } else {
+                sendErrorResponse(resp, registerResult.getError().getCode(), registerResult.getError().getMessage());
+            }
+        } catch (Exception e) {
+            logger.error("处理注册请求失败: {}", e.getMessage(), e);
+            sendErrorResponse(resp, RegisterErrorEnum.SYSTEM_ERROR.getCode(), RegisterErrorEnum.SYSTEM_ERROR.getMessage());
         }
     }
 

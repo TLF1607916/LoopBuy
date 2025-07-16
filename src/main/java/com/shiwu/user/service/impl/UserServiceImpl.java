@@ -3,10 +3,7 @@ package com.shiwu.user.service.impl;
 import com.shiwu.common.util.JwtUtil;
 import com.shiwu.common.util.PasswordUtil;
 import com.shiwu.user.dao.UserDao;
-import com.shiwu.user.model.LoginErrorEnum;
-import com.shiwu.user.model.LoginResult;
-import com.shiwu.user.model.User;
-import com.shiwu.user.model.UserVO;
+import com.shiwu.user.model.*;
 import com.shiwu.user.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,18 +46,45 @@ public class UserServiceImpl implements UserService {
                 return LoginResult.fail(LoginErrorEnum.ACCOUNT_BANNED);
             }
             
+            // 获取当前存储的密码哈希
+            String storedHash = user.getPassword();
+            
             // 验证密码
-            if (!PasswordUtil.matches(password, user.getPassword())) {
+            boolean passwordMatches = false;
+            
+            // 检查是否是旧格式密码（非BCrypt格式）
+            if (!PasswordUtil.isBCryptHash(storedHash)) {
+                // 使用旧方式验证密码
+                if (PasswordUtil.legacyMatches(password, storedHash)) {
+                    passwordMatches = true;
+                    
+                    // 密码验证成功，升级到BCrypt格式
+                    String bcryptHash = PasswordUtil.encrypt(password);
+                    if (bcryptHash != null) {
+                        // 更新数据库中的密码哈希
+                        if (userDao.updatePassword(user.getId(), bcryptHash)) {
+                            logger.info("用户 {} 的密码哈希已从旧格式升级到BCrypt格式", username);
+                        } else {
+                            logger.warn("用户 {} 的密码哈希升级失败", username);
+                        }
+                    }
+                }
+            } else {
+                // 使用BCrypt验证密码
+                passwordMatches = PasswordUtil.matches(password, storedHash);
+            }
+            
+            // 密码不正确
+            if (!passwordMatches) {
                 logger.warn("登录失败: 用户 {} 密码错误", username);
                 return LoginResult.fail(LoginErrorEnum.WRONG_PASSWORD);
             }
             
+            // 更新用户最后登录时间
+            userDao.updateLastLoginTime(user.getId());
+            
             // 登录成功，转换为VO对象
-            UserVO userVO = new UserVO();
-            userVO.setId(user.getId());
-            userVO.setUsername(user.getUsername());
-            userVO.setEmail(user.getEmail());
-            userVO.setPhone(user.getPhone());
+            UserVO userVO = convertToVO(user);
             
             // 生成JWT令牌
             String token = JwtUtil.generateToken(user.getId(), user.getUsername());
@@ -76,5 +100,108 @@ public class UserServiceImpl implements UserService {
             logger.error("登录过程发生异常: {}", e.getMessage(), e);
             return LoginResult.fail(LoginErrorEnum.SYSTEM_ERROR);
         }
+    }
+    
+    @Override
+    public RegisterResult register(RegisterRequest registerRequest) {
+        // 参数校验
+        if (registerRequest == null || registerRequest.getUsername() == null || registerRequest.getPassword() == null) {
+            logger.warn("注册失败: 必填参数为空");
+            return RegisterResult.fail(RegisterErrorEnum.PARAMETER_ERROR);
+        }
+        
+        try {
+            // 检查密码强度
+            if (!PasswordUtil.isStrongPassword(registerRequest.getPassword())) {
+                logger.warn("注册失败: 密码强度不足");
+                return RegisterResult.fail(RegisterErrorEnum.WEAK_PASSWORD);
+            }
+            
+            // 检查用户名唯一性
+            User existingUser = userDao.findByUsername(registerRequest.getUsername());
+            if (existingUser != null) {
+                logger.warn("注册失败: 用户名 {} 已存在", registerRequest.getUsername());
+                return RegisterResult.fail(RegisterErrorEnum.USERNAME_EXISTS);
+            }
+            
+            // 检查邮箱唯一性
+            if (registerRequest.getEmail() != null && !registerRequest.getEmail().isEmpty()) {
+                existingUser = userDao.findByEmail(registerRequest.getEmail());
+                if (existingUser != null) {
+                    logger.warn("注册失败: 邮箱 {} 已被注册", registerRequest.getEmail());
+                    return RegisterResult.fail(RegisterErrorEnum.EMAIL_EXISTS);
+                }
+            }
+            
+            // 检查手机号唯一性
+            if (registerRequest.getPhone() != null && !registerRequest.getPhone().isEmpty()) {
+                existingUser = userDao.findByPhone(registerRequest.getPhone());
+                if (existingUser != null) {
+                    logger.warn("注册失败: 手机号 {} 已被注册", registerRequest.getPhone());
+                    return RegisterResult.fail(RegisterErrorEnum.PHONE_EXISTS);
+                }
+            }
+            
+            // 创建新用户
+            User newUser = new User();
+            newUser.setUsername(registerRequest.getUsername());
+            // 使用BCrypt加盐哈希处理密码
+            String hashedPassword = PasswordUtil.encrypt(registerRequest.getPassword());
+            if (hashedPassword == null) {
+                logger.error("注册失败: 密码加密错误");
+                return RegisterResult.fail(RegisterErrorEnum.SYSTEM_ERROR);
+            }
+            newUser.setPassword(hashedPassword);
+            newUser.setEmail(registerRequest.getEmail());
+            newUser.setPhone(registerRequest.getPhone());
+            newUser.setNickname(registerRequest.getNickname());
+            newUser.setSchool(registerRequest.getSchool());
+            newUser.setStatus(USER_STATUS_NORMAL);
+            
+            Long userId = userDao.createUser(newUser);
+            if (userId == null) {
+                logger.error("注册失败: 创建用户数据库记录失败");
+                return RegisterResult.fail(RegisterErrorEnum.SYSTEM_ERROR);
+            }
+            
+            // 设置用户ID
+            newUser.setId(userId);
+            
+            // 转换为VO对象
+            UserVO userVO = convertToVO(newUser);
+            
+            // 生成JWT令牌
+            String token = JwtUtil.generateToken(userId, newUser.getUsername());
+            if (token == null) {
+                logger.error("用户 {} 注册成功但生成JWT令牌失败", newUser.getUsername());
+                return RegisterResult.fail(RegisterErrorEnum.SYSTEM_ERROR);
+            }
+            
+            userVO.setToken(token);
+            logger.info("用户 {} 注册成功并生成JWT令牌", newUser.getUsername());
+            return RegisterResult.success(userVO);
+        } catch (Exception e) {
+            logger.error("注册过程发生异常: {}", e.getMessage(), e);
+            return RegisterResult.fail(RegisterErrorEnum.SYSTEM_ERROR);
+        }
+    }
+    
+    /**
+     * 将User实体转换为UserVO视图对象
+     * @param user 用户实体
+     * @return 用户视图对象
+     */
+    private UserVO convertToVO(User user) {
+        UserVO userVO = new UserVO();
+        userVO.setId(user.getId());
+        userVO.setUsername(user.getUsername());
+        userVO.setEmail(user.getEmail());
+        userVO.setPhone(user.getPhone());
+        userVO.setStatus(user.getStatus());
+        userVO.setAvatarUrl(user.getAvatarUrl());
+        userVO.setNickname(user.getNickname());
+        userVO.setGender(user.getGender());
+        userVO.setSchool(user.getSchool());
+        return userVO;
     }
 }

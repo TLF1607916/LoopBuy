@@ -12,6 +12,12 @@ public class User {
     private String email;
     private String phone;
     private Integer status; // 用户状态: 0-正常, 1-已封禁
+    private String avatarUrl;
+    private String nickname;
+    private Integer gender; // 性别：0-未设置，1-男，2-女
+    private String bio;
+    private String school;
+    private LocalDateTime lastLoginTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private Boolean deleted;
@@ -62,6 +68,54 @@ public class User {
     
     public void setStatus(Integer status) {
         this.status = status;
+    }
+    
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+    
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+    
+    public String getNickname() {
+        return nickname;
+    }
+    
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+    
+    public Integer getGender() {
+        return gender;
+    }
+    
+    public void setGender(Integer gender) {
+        this.gender = gender;
+    }
+    
+    public String getBio() {
+        return bio;
+    }
+    
+    public void setBio(String bio) {
+        this.bio = bio;
+    }
+    
+    public String getSchool() {
+        return school;
+    }
+    
+    public void setSchool(String school) {
+        this.school = school;
+    }
+    
+    public LocalDateTime getLastLoginTime() {
+        return lastLoginTime;
+    }
+    
+    public void setLastLoginTime(LocalDateTime lastLoginTime) {
+        this.lastLoginTime = lastLoginTime;
     }
 
     public LocalDateTime getCreateTime() {
