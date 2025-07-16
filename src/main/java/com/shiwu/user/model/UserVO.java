@@ -8,6 +8,7 @@ public class UserVO {
     private String username;
     private String email;
     private String phone;
+    private String token;
 
     public Long getId() {
         return id;
@@ -39,5 +40,13 @@ public class UserVO {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+    
+    public String getToken() {
+        return token;
+    }
+    
+    public void setToken(String token) {
+        this.token = token;
     }
 }

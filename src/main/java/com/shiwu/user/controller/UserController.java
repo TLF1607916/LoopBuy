@@ -2,14 +2,16 @@ package com.shiwu.user.controller;
 
 import com.shiwu.common.result.Result;
 import com.shiwu.common.util.JsonUtil;
+import com.shiwu.user.model.LoginErrorEnum;
 import com.shiwu.user.model.LoginRequest;
-import com.shiwu.user.model.UserVO;
+import com.shiwu.user.model.LoginResult;
 import com.shiwu.user.service.UserService;
 import com.shiwu.user.service.impl.UserServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -20,6 +22,7 @@ import java.io.PrintWriter;
 /**
  * 用户控制器
  */
+@WebServlet("/api/user/*")
 public class UserController extends HttpServlet {
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
     private final UserService userService;
@@ -61,22 +64,22 @@ public class UserController extends HttpServlet {
             // 解析JSON请求
             LoginRequest loginRequest = JsonUtil.fromJson(requestBody.toString(), LoginRequest.class);
             if (loginRequest == null || loginRequest.getUsername() == null || loginRequest.getPassword() == null) {
-                sendErrorResponse(resp, "400", "无效的请求参数");
+                sendErrorResponse(resp, LoginErrorEnum.PARAMETER_ERROR.getCode(), LoginErrorEnum.PARAMETER_ERROR.getMessage());
                 return;
             }
 
             // 调用服务进行登录验证
-            UserVO userVO = userService.login(loginRequest.getUsername(), loginRequest.getPassword());
+            LoginResult loginResult = userService.login(loginRequest.getUsername(), loginRequest.getPassword());
             
             // 返回结果
-            if (userVO != null) {
-                sendSuccessResponse(resp, userVO);
+            if (loginResult.getSuccess()) {
+                sendSuccessResponse(resp, loginResult.getUserVO());
             } else {
-                sendErrorResponse(resp, "401", "用户名或密码错误");
+                sendErrorResponse(resp, loginResult.getError().getCode(), loginResult.getError().getMessage());
             }
         } catch (Exception e) {
             logger.error("处理登录请求失败: {}", e.getMessage(), e);
-            sendErrorResponse(resp, "500", "服务器内部错误");
+            sendErrorResponse(resp, LoginErrorEnum.SYSTEM_ERROR.getCode(), LoginErrorEnum.SYSTEM_ERROR.getMessage());
         }
     }
 
