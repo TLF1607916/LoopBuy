@@ -11,6 +11,7 @@ public class User {
     private String password;
     private String email;
     private String phone;
+    private Integer status; // 用户状态: 0-正常, 1-已封禁
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private Boolean deleted;
@@ -53,6 +54,14 @@ public class User {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+    
+    public Integer getStatus() {
+        return status;
+    }
+    
+    public void setStatus(Integer status) {
+        this.status = status;
     }
 
     public LocalDateTime getCreateTime() {

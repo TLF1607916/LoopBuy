@@ -23,7 +23,7 @@ public class UserDao {
      * @return 用户对象，如果不存在则返回null
      */
     public User findByUsername(String username) {
-        String sql = "SELECT id, username, password, email, phone, create_time, update_time, is_deleted FROM system_user WHERE username = ? AND is_deleted = 0";
+        String sql = "SELECT id, username, password, email, phone, status, create_time, update_time, is_deleted FROM system_user WHERE username = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -42,6 +42,7 @@ public class UserDao {
                 user.setPassword(rs.getString("password"));
                 user.setEmail(rs.getString("email"));
                 user.setPhone(rs.getString("phone"));
+                user.setStatus(rs.getInt("status"));
                 user.setCreateTime(rs.getObject("create_time", LocalDateTime.class));
                 user.setUpdateTime(rs.getObject("update_time", LocalDateTime.class));
                 user.setDeleted(rs.getBoolean("is_deleted"));
