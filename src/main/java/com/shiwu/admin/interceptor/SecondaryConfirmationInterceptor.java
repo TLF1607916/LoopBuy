@@ -40,6 +40,7 @@ public class SecondaryConfirmationInterceptor implements Filter {
     private static final List<HighRiskOperationMapping> OPERATION_MAPPINGS = Arrays.asList(
             new HighRiskOperationMapping("/api/admin/users/delete", "DELETE_USER_PERMANENTLY"),
             new HighRiskOperationMapping("/api/admin/users/batch-ban", "BATCH_BAN_USERS"),
+            new HighRiskOperationMapping("/api/admin/users/batch-mute", "BATCH_MUTE_USERS"),
             new HighRiskOperationMapping("/api/admin/users/reset-password", "RESET_USER_PASSWORD"),
             new HighRiskOperationMapping("/api/admin/products/delete", "DELETE_PRODUCT_PERMANENTLY"),
             new HighRiskOperationMapping("/api/admin/products/batch-remove", "BATCH_REMOVE_PRODUCTS"),

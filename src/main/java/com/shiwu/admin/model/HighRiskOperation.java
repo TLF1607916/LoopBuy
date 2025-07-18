@@ -11,12 +11,17 @@ public enum HighRiskOperation {
      * 永久删除用户账户
      */
     DELETE_USER_PERMANENTLY("DELETE_USER_PERMANENTLY", "永久删除用户账户", "SUPER_ADMIN"),
-    
+
     /**
      * 批量封禁用户
      */
-    BATCH_BAN_USERS("BATCH_BAN_USERS", "批量封禁用户", "SUPER_ADMIN"),
-    
+    BATCH_BAN_USERS("BATCH_BAN_USERS", "批量封禁用户", "ADMIN"),
+
+    /**
+     * 批量禁言用户
+     */
+    BATCH_MUTE_USERS("BATCH_MUTE_USERS", "批量禁言用户", "ADMIN"),
+
     /**
      * 重置用户密码
      */
