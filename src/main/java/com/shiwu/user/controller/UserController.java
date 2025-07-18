@@ -16,6 +16,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 用户控制器
@@ -41,6 +43,10 @@ public class UserController extends HttpServlet {
         // 处理 /api/user/{userId} 格式的请求
         if (pathInfo.matches("^/\\d+$")) {
             handleGetUserProfile(req, resp);
+        }
+        // 处理 /api/user/{userId}/follow 格式的请求
+        else if (pathInfo.matches("^/\\d+/follow$")) {
+            handleGetFollowStatus(req, resp);
         } else {
             sendErrorResponse(resp, "404", "请求路径不存在");
         }
@@ -55,6 +61,12 @@ public class UserController extends HttpServlet {
             return;
         }
 
+        // 处理关注用户请求 /api/user/{userId}/follow
+        if (pathInfo.matches("^/\\d+/follow$")) {
+            handleFollowUser(req, resp);
+            return;
+        }
+
         switch (pathInfo) {
             case "/login":
                 handleLogin(req, resp);
@@ -64,6 +76,23 @@ public class UserController extends HttpServlet {
                 break;
             default:
                 sendErrorResponse(resp, "404", "请求路径不存在");
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String pathInfo = req.getPathInfo();
+
+        if (pathInfo == null) {
+            sendErrorResponse(resp, "404", "请求路径不存在");
+            return;
+        }
+
+        // 处理取关用户请求 /api/user/{userId}/follow
+        if (pathInfo.matches("^/\\d+/follow$")) {
+            handleUnfollowUser(req, resp);
+        } else {
+            sendErrorResponse(resp, "404", "请求路径不存在");
         }
     }
 
@@ -189,6 +218,146 @@ public class UserController extends HttpServlet {
         PrintWriter out = resp.getWriter();
         out.print(jsonResponse);
         out.flush();
+    }
+
+    /**
+     * 处理关注用户请求
+     * API: POST /api/user/{userId}/follow
+     */
+    private void handleFollowUser(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        try {
+            // 从路径中提取目标用户ID
+            String pathInfo = req.getPathInfo();
+            String userIdStr = pathInfo.substring(1, pathInfo.lastIndexOf("/follow")); // 去掉开头的 "/" 和结尾的 "/follow"
+            Long targetUserId;
+
+            try {
+                targetUserId = Long.parseLong(userIdStr);
+            } catch (NumberFormatException e) {
+                sendErrorResponse(resp, "A0201", "用户ID格式错误");
+                return;
+            }
+
+            // 获取当前登录用户ID（从JWT token中解析）
+            // TODO: 实现JWT token解析获取当前用户ID
+            Long currentUserId = getCurrentUserIdFromToken(req);
+            if (currentUserId == null) {
+                sendErrorResponse(resp, "A0300", "请先登录");
+                return;
+            }
+
+            // 调用服务执行关注操作
+            FollowResult followResult = userService.followUser(currentUserId, targetUserId);
+
+            if (followResult.isSuccess()) {
+                // 返回成功结果
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("isFollowing", followResult.getIsFollowing());
+                responseData.put("followerCount", followResult.getFollowerCount());
+                sendSuccessResponse(resp, responseData);
+            } else {
+                // 返回详细的错误信息
+                sendErrorResponse(resp, followResult.getError().getCode(), followResult.getError().getMessage());
+            }
+
+        } catch (Exception e) {
+            logger.error("处理关注用户请求失败: {}", e.getMessage(), e);
+            sendErrorResponse(resp, "B0001", "系统执行错误");
+        }
+    }
+
+    /**
+     * 处理取关用户请求
+     * API: DELETE /api/user/{userId}/follow
+     */
+    private void handleUnfollowUser(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        try {
+            // 从路径中提取目标用户ID
+            String pathInfo = req.getPathInfo();
+            String userIdStr = pathInfo.substring(1, pathInfo.lastIndexOf("/follow")); // 去掉开头的 "/" 和结尾的 "/follow"
+            Long targetUserId;
+
+            try {
+                targetUserId = Long.parseLong(userIdStr);
+            } catch (NumberFormatException e) {
+                sendErrorResponse(resp, "A0201", "用户ID格式错误");
+                return;
+            }
+
+            // 获取当前登录用户ID（从JWT token中解析）
+            // TODO: 实现JWT token解析获取当前用户ID
+            Long currentUserId = getCurrentUserIdFromToken(req);
+            if (currentUserId == null) {
+                sendErrorResponse(resp, "A0300", "请先登录");
+                return;
+            }
+
+            // 调用服务执行取关操作
+            FollowResult unfollowResult = userService.unfollowUser(currentUserId, targetUserId);
+
+            if (unfollowResult.isSuccess()) {
+                // 返回成功结果
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("isFollowing", unfollowResult.getIsFollowing());
+                responseData.put("followerCount", unfollowResult.getFollowerCount());
+                sendSuccessResponse(resp, responseData);
+            } else {
+                // 返回详细的错误信息
+                sendErrorResponse(resp, unfollowResult.getError().getCode(), unfollowResult.getError().getMessage());
+            }
+
+        } catch (Exception e) {
+            logger.error("处理取关用户请求失败: {}", e.getMessage(), e);
+            sendErrorResponse(resp, "B0001", "系统执行错误");
+        }
+    }
+
+    /**
+     * 处理获取关注状态请求
+     * API: GET /api/user/{userId}/follow
+     */
+    private void handleGetFollowStatus(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        try {
+            // 从路径中提取目标用户ID
+            String pathInfo = req.getPathInfo();
+            String userIdStr = pathInfo.substring(1, pathInfo.lastIndexOf("/follow")); // 去掉开头的 "/" 和结尾的 "/follow"
+            Long targetUserId;
+
+            try {
+                targetUserId = Long.parseLong(userIdStr);
+            } catch (NumberFormatException e) {
+                sendErrorResponse(resp, "A0201", "用户ID格式错误");
+                return;
+            }
+
+            // 获取当前登录用户ID（从JWT token中解析，可为null）
+            Long currentUserId = getCurrentUserIdFromToken(req);
+
+            // 调用服务获取关注状态
+            FollowStatusVO followStatus = userService.getFollowStatus(currentUserId, targetUserId);
+
+            if (followStatus == null) {
+                sendErrorResponse(resp, "A0120", "用户不存在");
+                return;
+            }
+
+            // 返回成功结果
+            sendSuccessResponse(resp, followStatus);
+
+        } catch (Exception e) {
+            logger.error("处理获取关注状态请求失败: {}", e.getMessage(), e);
+            sendErrorResponse(resp, "B0001", "系统执行错误");
+        }
+    }
+
+    /**
+     * 从JWT token中获取当前用户ID
+     * TODO: 实现JWT token解析
+     */
+    private Long getCurrentUserIdFromToken(HttpServletRequest req) {
+        // 暂时返回null，表示未登录
+        // 实际实现中应该从Authorization header中解析JWT token
+        return null;
     }
 
     /**

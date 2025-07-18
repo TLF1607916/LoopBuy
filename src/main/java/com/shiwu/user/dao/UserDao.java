@@ -24,7 +24,7 @@ public class UserDao {
      * @return 用户对象，如果不存在则返回null
      */
     public User findByUsername(String username) {
-        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, school, last_login_time, create_time, update_time, is_deleted FROM system_user WHERE username = ? AND is_deleted = 0";
+        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, follower_count, average_rating, last_login_time FROM system_user WHERE username = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -48,11 +48,9 @@ public class UserDao {
                 user.setNickname(rs.getString("nickname"));
                 user.setGender(rs.getInt("gender"));
                 user.setBio(rs.getString("bio"));
-                user.setSchool(rs.getString("school"));
+                user.setFollowerCount(rs.getInt("follower_count"));
+                user.setAverageRating(rs.getBigDecimal("average_rating"));
                 user.setLastLoginTime(rs.getObject("last_login_time", LocalDateTime.class));
-                user.setCreateTime(rs.getObject("create_time", LocalDateTime.class));
-                user.setUpdateTime(rs.getObject("update_time", LocalDateTime.class));
-                user.setDeleted(rs.getBoolean("is_deleted"));
             }
         } catch (SQLException e) {
             logger.error("查询用户失败: {}", e.getMessage(), e);
@@ -69,7 +67,7 @@ public class UserDao {
      * @return 用户对象，如果不存在则返回null
      */
     public User findById(Long userId) {
-        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, school, follower_count, average_rating, last_login_time, create_time, update_time, is_deleted FROM system_user WHERE id = ? AND is_deleted = 0";
+        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, follower_count, average_rating, last_login_time FROM system_user WHERE id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -93,13 +91,9 @@ public class UserDao {
                 user.setNickname(rs.getString("nickname"));
                 user.setGender(rs.getInt("gender"));
                 user.setBio(rs.getString("bio"));
-                user.setSchool(rs.getString("school"));
                 user.setFollowerCount(rs.getInt("follower_count"));
                 user.setAverageRating(rs.getBigDecimal("average_rating"));
                 user.setLastLoginTime(rs.getObject("last_login_time", LocalDateTime.class));
-                user.setCreateTime(rs.getObject("create_time", LocalDateTime.class));
-                user.setUpdateTime(rs.getObject("update_time", LocalDateTime.class));
-                user.setDeleted(rs.getBoolean("is_deleted"));
             }
         } catch (SQLException e) {
             logger.error("根据ID查询用户失败: {}", e.getMessage(), e);
@@ -120,7 +114,7 @@ public class UserDao {
             return null;
         }
         
-        String sql = "SELECT id FROM system_user WHERE email = ? AND is_deleted = 0";
+        String sql = "SELECT id, username, password, email, phone, nickname, gender, bio, follower_count, average_rating, status, last_login_time FROM system_user WHERE email = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -135,6 +129,17 @@ public class UserDao {
             if (rs.next()) {
                 user = new User();
                 user.setId(rs.getLong("id"));
+                user.setUsername(rs.getString("username"));
+                user.setPassword(rs.getString("password"));
+                user.setEmail(rs.getString("email"));
+                user.setPhone(rs.getString("phone"));
+                user.setNickname(rs.getString("nickname"));
+                user.setGender(rs.getInt("gender"));
+                user.setBio(rs.getString("bio"));
+                user.setFollowerCount(rs.getInt("follower_count"));
+                user.setAverageRating(rs.getBigDecimal("average_rating"));
+                user.setStatus(rs.getInt("status"));
+                user.setLastLoginTime(rs.getObject("last_login_time", LocalDateTime.class));
             }
         } catch (SQLException e) {
             logger.error("根据邮箱查询用户失败: {}", e.getMessage(), e);
@@ -186,7 +191,7 @@ public class UserDao {
      * @return 创建成功返回用户ID，失败返回null
      */
     public Long createUser(User user) {
-        String sql = "INSERT INTO system_user (username, password, email, phone, status, nickname, school) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO system_user (username, password, email, phone, status, nickname) VALUES (?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -201,7 +206,6 @@ public class UserDao {
             pstmt.setString(4, user.getPhone());
             pstmt.setInt(5, user.getStatus() != null ? user.getStatus() : 0);
             pstmt.setString(6, user.getNickname());
-            pstmt.setString(7, user.getSchool());
             
             int rows = pstmt.executeUpdate();
             

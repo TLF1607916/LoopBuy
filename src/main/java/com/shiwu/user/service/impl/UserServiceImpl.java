@@ -3,6 +3,7 @@ package com.shiwu.user.service.impl;
 import com.shiwu.common.util.JwtUtil;
 import com.shiwu.common.util.PasswordUtil;
 import com.shiwu.user.dao.UserDao;
+import com.shiwu.user.dao.UserFollowDao;
 import com.shiwu.user.model.*;
 import com.shiwu.user.service.UserService;
 import org.slf4j.Logger;
@@ -15,11 +16,14 @@ public class UserServiceImpl implements UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
     private static final Integer USER_STATUS_NORMAL = 0;
     private static final Integer USER_STATUS_BANNED = 1;
-    
+    private static final Integer USER_STATUS_MUTED = 2;
+
     private final UserDao userDao;
+    private final UserFollowDao userFollowDao;
 
     public UserServiceImpl() {
         this.userDao = new UserDao();
+        this.userFollowDao = new UserFollowDao();
     }
 
     @Override
@@ -155,7 +159,6 @@ public class UserServiceImpl implements UserService {
             newUser.setEmail(registerRequest.getEmail());
             newUser.setPhone(registerRequest.getPhone());
             newUser.setNickname(registerRequest.getNickname());
-            newUser.setSchool(registerRequest.getSchool());
             newUser.setStatus(USER_STATUS_NORMAL);
             
             Long userId = userDao.createUser(newUser);
@@ -243,6 +246,246 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    @Override
+    public UserProfileResult getUserProfileWithErrorHandling(Long userId, Long currentUserId) {
+        // 参数校验
+        if (userId == null) {
+            logger.warn("获取用户主页失败: 用户ID为空");
+            return UserProfileResult.fail(UserProfileErrorEnum.PARAMETER_ERROR);
+        }
+
+        // 验证用户ID格式（必须为正数）
+        if (userId <= 0) {
+            logger.warn("获取用户主页失败: 用户ID格式错误 {}", userId);
+            return UserProfileResult.fail(UserProfileErrorEnum.INVALID_USER_ID);
+        }
+
+        try {
+            // 获取用户公开信息
+            User user = userDao.findPublicInfoById(userId);
+            if (user == null) {
+                logger.warn("获取用户主页失败: 用户 {} 不存在", userId);
+                return UserProfileResult.fail(UserProfileErrorEnum.USER_NOT_FOUND);
+            }
+
+            // 检查用户状态
+            if (USER_STATUS_BANNED.equals(user.getStatus())) {
+                logger.warn("获取用户主页失败: 用户 {} 已被封禁", userId);
+                return UserProfileResult.fail(UserProfileErrorEnum.USER_BANNED);
+            }
+
+            if (USER_STATUS_MUTED.equals(user.getStatus())) {
+                logger.warn("获取用户主页失败: 用户 {} 已被禁言", userId);
+                return UserProfileResult.fail(UserProfileErrorEnum.USER_MUTED);
+            }
+
+            // 构建UserProfileVO
+            UserProfileVO profileVO = new UserProfileVO();
+
+            // 设置基本用户信息
+            UserVO userVO = new UserVO();
+            userVO.setId(user.getId());
+            userVO.setUsername(user.getUsername());
+            userVO.setNickname(user.getNickname());
+            userVO.setAvatarUrl(user.getAvatarUrl());
+            profileVO.setUser(userVO);
+
+            // 设置统计信息
+            profileVO.setFollowerCount(user.getFollowerCount());
+            profileVO.setAverageRating(user.getAverageRating());
+            profileVO.setRegistrationDate(user.getCreateTime());
+
+            // 获取在售商品列表
+            profileVO.setOnSaleProducts(userDao.findOnSaleProductsByUserId(userId));
+
+            // 判断当前用户是否关注了该用户
+            if (currentUserId != null) {
+                profileVO.setIsFollowing(userFollowDao.isFollowing(currentUserId, userId));
+            } else {
+                profileVO.setIsFollowing(false);
+            }
+
+            logger.info("成功获取用户 {} 的主页信息", userId);
+            return UserProfileResult.success(profileVO);
+
+        } catch (Exception e) {
+            logger.error("获取用户主页过程发生异常: {}", e.getMessage(), e);
+            return UserProfileResult.fail(UserProfileErrorEnum.SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public FollowResult followUser(Long currentUserId, Long targetUserId) {
+        // 参数校验
+        if (currentUserId == null) {
+            logger.warn("关注用户失败: 当前用户ID为空");
+            return FollowResult.fail(FollowErrorEnum.NOT_AUTHENTICATED);
+        }
+
+        if (targetUserId == null) {
+            logger.warn("关注用户失败: 目标用户ID为空");
+            return FollowResult.fail(FollowErrorEnum.PARAMETER_ERROR);
+        }
+
+        // 验证用户ID格式
+        if (currentUserId <= 0 || targetUserId <= 0) {
+            logger.warn("关注用户失败: 用户ID格式错误 currentUserId={}, targetUserId={}", currentUserId, targetUserId);
+            return FollowResult.fail(FollowErrorEnum.INVALID_USER_ID);
+        }
+
+        // 不能关注自己
+        if (currentUserId.equals(targetUserId)) {
+            logger.warn("关注用户失败: 不能关注自己 userId={}", currentUserId);
+            return FollowResult.fail(FollowErrorEnum.CANNOT_FOLLOW_SELF);
+        }
+
+        try {
+            // 检查目标用户是否存在
+            User targetUser = userDao.findPublicInfoById(targetUserId);
+            if (targetUser == null) {
+                logger.warn("关注用户失败: 目标用户 {} 不存在", targetUserId);
+                return FollowResult.fail(FollowErrorEnum.TARGET_USER_NOT_FOUND);
+            }
+
+            // 检查目标用户状态
+            if (USER_STATUS_BANNED.equals(targetUser.getStatus())) {
+                logger.warn("关注用户失败: 目标用户 {} 已被封禁", targetUserId);
+                return FollowResult.fail(FollowErrorEnum.TARGET_USER_BANNED);
+            }
+
+            // 检查是否已经关注
+            if (userFollowDao.isFollowing(currentUserId, targetUserId)) {
+                logger.warn("关注用户失败: 已经关注了用户 {}", targetUserId);
+                return FollowResult.fail(FollowErrorEnum.ALREADY_FOLLOWING);
+            }
+
+            // 执行关注操作
+            boolean success = userFollowDao.followUser(currentUserId, targetUserId);
+            if (!success) {
+                logger.error("关注用户失败: 数据库操作失败 currentUserId={}, targetUserId={}", currentUserId, targetUserId);
+                return FollowResult.fail(FollowErrorEnum.DATABASE_ERROR);
+            }
+
+            // 获取更新后的粉丝数量
+            int followerCount = userFollowDao.getFollowerCount(targetUserId);
+
+            logger.info("关注用户成功: currentUserId={}, targetUserId={}, followerCount={}", currentUserId, targetUserId, followerCount);
+            return FollowResult.success(true, followerCount);
+
+        } catch (Exception e) {
+            logger.error("关注用户过程发生异常: currentUserId={}, targetUserId={}, error={}", currentUserId, targetUserId, e.getMessage(), e);
+            return FollowResult.fail(FollowErrorEnum.SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public FollowResult unfollowUser(Long currentUserId, Long targetUserId) {
+        // 参数校验
+        if (currentUserId == null) {
+            logger.warn("取关用户失败: 当前用户ID为空");
+            return FollowResult.fail(FollowErrorEnum.NOT_AUTHENTICATED);
+        }
+
+        if (targetUserId == null) {
+            logger.warn("取关用户失败: 目标用户ID为空");
+            return FollowResult.fail(FollowErrorEnum.PARAMETER_ERROR);
+        }
+
+        // 验证用户ID格式
+        if (currentUserId <= 0 || targetUserId <= 0) {
+            logger.warn("取关用户失败: 用户ID格式错误 currentUserId={}, targetUserId={}", currentUserId, targetUserId);
+            return FollowResult.fail(FollowErrorEnum.INVALID_USER_ID);
+        }
+
+        // 不能取关自己
+        if (currentUserId.equals(targetUserId)) {
+            logger.warn("取关用户失败: 不能取关自己 userId={}", currentUserId);
+            return FollowResult.fail(FollowErrorEnum.CANNOT_FOLLOW_SELF);
+        }
+
+        try {
+            // 检查目标用户是否存在
+            User targetUser = userDao.findPublicInfoById(targetUserId);
+            if (targetUser == null) {
+                logger.warn("取关用户失败: 目标用户 {} 不存在", targetUserId);
+                return FollowResult.fail(FollowErrorEnum.TARGET_USER_NOT_FOUND);
+            }
+
+            // 检查是否已经关注
+            if (!userFollowDao.isFollowing(currentUserId, targetUserId)) {
+                logger.warn("取关用户失败: 未关注用户 {}", targetUserId);
+                return FollowResult.fail(FollowErrorEnum.NOT_FOLLOWING);
+            }
+
+            // 执行取关操作
+            boolean success = userFollowDao.unfollowUser(currentUserId, targetUserId);
+            if (!success) {
+                logger.error("取关用户失败: 数据库操作失败 currentUserId={}, targetUserId={}", currentUserId, targetUserId);
+                return FollowResult.fail(FollowErrorEnum.DATABASE_ERROR);
+            }
+
+            // 获取更新后的粉丝数量
+            int followerCount = userFollowDao.getFollowerCount(targetUserId);
+
+            logger.info("取关用户成功: currentUserId={}, targetUserId={}, followerCount={}", currentUserId, targetUserId, followerCount);
+            return FollowResult.success(false, followerCount);
+
+        } catch (Exception e) {
+            logger.error("取关用户过程发生异常: currentUserId={}, targetUserId={}, error={}", currentUserId, targetUserId, e.getMessage(), e);
+            return FollowResult.fail(FollowErrorEnum.SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public FollowStatusVO getFollowStatus(Long currentUserId, Long targetUserId) {
+        // 参数校验
+        if (targetUserId == null) {
+            logger.warn("获取关注状态失败: 目标用户ID为空");
+            return null;
+        }
+
+        // 验证用户ID格式
+        if (targetUserId <= 0) {
+            logger.warn("获取关注状态失败: 目标用户ID格式错误 {}", targetUserId);
+            return null;
+        }
+
+        try {
+            // 检查目标用户是否存在
+            User targetUser = userDao.findPublicInfoById(targetUserId);
+            if (targetUser == null) {
+                logger.warn("获取关注状态失败: 目标用户 {} 不存在", targetUserId);
+                return null;
+            }
+
+            // 构建关注状态VO
+            FollowStatusVO statusVO = new FollowStatusVO();
+            statusVO.setUserId(targetUser.getId());
+            statusVO.setUsername(targetUser.getUsername());
+            statusVO.setNickname(targetUser.getNickname());
+
+            // 获取粉丝数量和关注数量
+            statusVO.setFollowerCount(userFollowDao.getFollowerCount(targetUserId));
+            statusVO.setFollowingCount(userFollowDao.getFollowingCount(targetUserId));
+
+            // 判断当前用户是否关注了目标用户
+            if (currentUserId != null && currentUserId > 0) {
+                statusVO.setIsFollowing(userFollowDao.isFollowing(currentUserId, targetUserId));
+            } else {
+                statusVO.setIsFollowing(false);
+            }
+
+            logger.info("成功获取关注状态: currentUserId={}, targetUserId={}, isFollowing={}",
+                       currentUserId, targetUserId, statusVO.getIsFollowing());
+            return statusVO;
+
+        } catch (Exception e) {
+            logger.error("获取关注状态过程发生异常: currentUserId={}, targetUserId={}, error={}",
+                        currentUserId, targetUserId, e.getMessage(), e);
+            return null;
+        }
+    }
+
     /**
      * 将User实体转换为UserVO视图对象
      * @param user 用户实体
@@ -258,7 +501,6 @@ public class UserServiceImpl implements UserService {
         userVO.setAvatarUrl(user.getAvatarUrl());
         userVO.setNickname(user.getNickname());
         userVO.setGender(user.getGender());
-        userVO.setSchool(user.getSchool());
         return userVO;
     }
 }
