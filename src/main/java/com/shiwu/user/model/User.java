@@ -17,7 +17,6 @@ public class User {
     private String nickname;
     private Integer gender; // 性别：0-未设置，1-男，2-女
     private String bio;
-    private String school;
     private Integer followerCount; // 粉丝数量
     private BigDecimal averageRating; // 平均评分（作为卖家）
     private LocalDateTime lastLoginTime;
@@ -104,15 +103,7 @@ public class User {
     public void setBio(String bio) {
         this.bio = bio;
     }
-    
-    public String getSchool() {
-        return school;
-    }
-    
-    public void setSchool(String school) {
-        this.school = school;
-    }
-    
+
     public LocalDateTime getLastLoginTime() {
         return lastLoginTime;
     }

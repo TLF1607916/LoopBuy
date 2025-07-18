@@ -13,7 +13,6 @@ public class UserVO {
     private String avatarUrl;
     private String nickname;
     private Integer gender;
-    private String school;
 
     public Long getId() {
         return id;
@@ -85,13 +84,5 @@ public class UserVO {
     
     public void setGender(Integer gender) {
         this.gender = gender;
-    }
-    
-    public String getSchool() {
-        return school;
-    }
-    
-    public void setSchool(String school) {
-        this.school = school;
     }
 }

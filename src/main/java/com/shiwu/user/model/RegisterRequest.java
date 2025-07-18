@@ -9,7 +9,6 @@ public class RegisterRequest {
     private String email;
     private String phone;
     private String nickname;
-    private String school;
 
     public String getUsername() {
         return username;
@@ -50,12 +49,4 @@ public class RegisterRequest {
     public void setNickname(String nickname) {
         this.nickname = nickname;
     }
-
-    public String getSchool() {
-        return school;
-    }
-
-    public void setSchool(String school) {
-        this.school = school;
-    }
-} 
+}
