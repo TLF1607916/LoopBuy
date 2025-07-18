@@ -7,6 +7,10 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 审计日志数据访问对象
@@ -105,6 +109,144 @@ public class AuditLogDao {
         auditLog.setResult(success ? 1 : 0);
         
         return createAuditLog(auditLog);
+    }
+
+    // ====================================================================
+    // 统计查询方法（用于管理员仪表盘）
+    // ====================================================================
+
+    /**
+     * 获取指定时间段内的审计日志数量
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 审计日志数量
+     */
+    public Long getAuditLogCount(LocalDateTime startTime, LocalDateTime endTime) {
+        String sql = "SELECT COUNT(*) FROM audit_log WHERE create_time >= ? AND create_time < ?";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setObject(1, startTime);
+            pstmt.setObject(2, endTime);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("查询审计日志数量失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
+    }
+
+    /**
+     * 获取管理员登录次数统计
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 登录次数
+     */
+    public Long getAdminLoginCount(LocalDateTime startTime, LocalDateTime endTime) {
+        String sql = "SELECT COUNT(*) FROM audit_log WHERE action LIKE '%登录%' AND result = 1 AND create_time >= ? AND create_time < ?";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setObject(1, startTime);
+            pstmt.setObject(2, endTime);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("查询管理员登录次数失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
+    }
+
+    /**
+     * 获取系统错误数量统计
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 错误数量
+     */
+    public Long getSystemErrorCount(LocalDateTime startTime, LocalDateTime endTime) {
+        String sql = "SELECT COUNT(*) FROM audit_log WHERE result = 0 AND create_time >= ? AND create_time < ?";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setObject(1, startTime);
+            pstmt.setObject(2, endTime);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("查询系统错误数量失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
+    }
+
+    /**
+     * 获取活动趋势数据（按天统计）
+     * @param days 统计天数
+     * @return 趋势数据列表，每个元素包含日期和当天活动数量
+     */
+    public List<Map<String, Object>> getActivityTrend(int days) {
+        String sql = "SELECT DATE(create_time) as date, COUNT(*) as count " +
+                    "FROM audit_log " +
+                    "WHERE create_time >= DATE_SUB(NOW(), INTERVAL ? DAY) " +
+                    "GROUP BY DATE(create_time) " +
+                    "ORDER BY date";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        List<Map<String, Object>> trendData = new ArrayList<>();
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, days);
+            rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("date", rs.getDate("date").toString());
+                data.put("count", rs.getLong("count"));
+                trendData.add(data);
+            }
+        } catch (SQLException e) {
+            logger.error("查询活动趋势失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return trendData;
     }
 
     /**

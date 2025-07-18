@@ -10,7 +10,9 @@ import java.math.BigDecimal;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户数据访问对象
@@ -341,6 +343,191 @@ public class UserDao {
         // 根据模块解耦原则，UserDao不应该直接查询product表
         logger.warn("获取用户在售商品列表功能暂未实现，需要产品模块支持");
         return new ArrayList<>();
+    }
+
+    // ====================================================================
+    // 统计查询方法（用于管理员仪表盘）
+    // ====================================================================
+
+    /**
+     * 获取用户总数
+     * @return 用户总数
+     */
+    public Long getTotalUserCount() {
+        String sql = "SELECT COUNT(*) FROM system_user WHERE is_deleted = 0";
+        return executeCountQuery(sql);
+    }
+
+    /**
+     * 获取活跃用户数（最近30天登录）
+     * @return 活跃用户数
+     */
+    public Long getActiveUserCount() {
+        String sql = "SELECT COUNT(*) FROM system_user WHERE is_deleted = 0 AND last_login_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+        return executeCountQuery(sql);
+    }
+
+    /**
+     * 获取指定时间段内新增用户数
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 新增用户数
+     */
+    public Long getNewUserCount(LocalDateTime startTime, LocalDateTime endTime) {
+        String sql = "SELECT COUNT(*) FROM system_user WHERE is_deleted = 0 AND create_time >= ? AND create_time < ?";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setObject(1, startTime);
+            pstmt.setObject(2, endTime);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("查询新增用户数失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
+    }
+
+    /**
+     * 获取指定状态的用户数
+     * @param status 用户状态（0-正常，1-已封禁，2-已禁言）
+     * @return 用户数
+     */
+    public Long getUserCountByStatus(Integer status) {
+        String sql = "SELECT COUNT(*) FROM system_user WHERE is_deleted = 0 AND status = ?";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, status);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("查询指定状态用户数失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
+    }
+
+    /**
+     * 获取平台平均评分
+     * @return 平均评分
+     */
+    public Double getAverageRating() {
+        String sql = "SELECT AVG(average_rating) FROM system_user WHERE is_deleted = 0 AND average_rating > 0";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Double avgRating = 0.0;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                avgRating = rs.getDouble(1);
+            }
+        } catch (SQLException e) {
+            logger.error("查询平均评分失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return avgRating;
+    }
+
+    /**
+     * 获取用户增长趋势数据（按天统计）
+     * @param days 统计天数
+     * @return 趋势数据列表，每个元素包含日期和当天新增用户数
+     */
+    public List<Map<String, Object>> getUserGrowthTrend(int days) {
+        String sql = "SELECT DATE(create_time) as date, COUNT(*) as count " +
+                    "FROM system_user " +
+                    "WHERE is_deleted = 0 AND create_time >= DATE_SUB(NOW(), INTERVAL ? DAY) " +
+                    "GROUP BY DATE(create_time) " +
+                    "ORDER BY date";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        List<Map<String, Object>> trendData = new ArrayList<>();
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, days);
+            rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("date", rs.getDate("date").toString());
+                data.put("count", rs.getLong("count"));
+                trendData.add(data);
+            }
+        } catch (SQLException e) {
+            logger.error("查询用户增长趋势失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return trendData;
+    }
+
+    /**
+     * 执行计数查询的通用方法
+     * @param sql SQL查询语句
+     * @return 计数结果
+     */
+    private Long executeCountQuery(String sql) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) {
+                logger.error("数据库连接为空");
+                return count;
+            }
+
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("执行计数查询失败: {}", e.getMessage(), e);
+        } catch (Exception e) {
+            logger.error("执行计数查询时发生未知异常: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
     }
 
     /**
