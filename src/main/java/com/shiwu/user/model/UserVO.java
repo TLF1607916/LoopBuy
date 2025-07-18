@@ -9,6 +9,11 @@ public class UserVO {
     private String email;
     private String phone;
     private String token;
+    private Integer status;
+    private String avatarUrl;
+    private String nickname;
+    private Integer gender;
+    private String school;
 
     public Long getId() {
         return id;
@@ -48,5 +53,45 @@ public class UserVO {
     
     public void setToken(String token) {
         this.token = token;
+    }
+    
+    public Integer getStatus() {
+        return status;
+    }
+    
+    public void setStatus(Integer status) {
+        this.status = status;
+    }
+    
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+    
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+    
+    public String getNickname() {
+        return nickname;
+    }
+    
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+    
+    public Integer getGender() {
+        return gender;
+    }
+    
+    public void setGender(Integer gender) {
+        this.gender = gender;
+    }
+    
+    public String getSchool() {
+        return school;
+    }
+    
+    public void setSchool(String school) {
+        this.school = school;
     }
 }
