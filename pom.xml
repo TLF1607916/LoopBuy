@@ -16,6 +16,9 @@
         <slf4j.version>1.7.36</slf4j.version>
         <jackson.version>2.15.2</jackson.version>
         <jjwt.version>0.11.5</jjwt.version>
+        <commons-fileupload.version>1.5</commons-fileupload.version>
+        <junit.version>5.9.2</junit.version>
+        <mockito.version>5.3.1</mockito.version>
     </properties>
 
     <dependencies>
@@ -64,6 +67,17 @@
             <artifactId>commons-codec</artifactId>
             <version>1.15</version>
         </dependency>
+        <!-- Apache Commons FileUpload -->
+        <dependency>
+            <groupId>commons-fileupload</groupId>
+            <artifactId>commons-fileupload</artifactId>
+            <version>${commons-fileupload.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.11.0</version>
+        </dependency>
         
         <!-- BCrypt for password hashing -->
         <dependency>
@@ -91,6 +105,36 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- JUnit and Mockito for testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+             
+
+        <!--
+             
         <!-- JUnit and Mockito for testing (Java 8 compatible versions) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -104,6 +148,10 @@
             <version>4.11.0</version>
             <scope>test</scope>
         </dependency>
+
+        -->
+
+             
     </dependencies>
 
     <build>
@@ -116,11 +164,15 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.0.0-M9</version>
+                <version>3.2.2</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.tomcat.maven</groupId>
+                <artifactId>tomcat7-maven-plugin</artifactId>
+                <version>2.2</version>
                 <configuration>
-                    <includes>
-                        <include>**/*Test.java</include>
-                    </includes>
+                    <port>8080</port>
+                    <path>/</path>
                 </configuration>
             </plugin>
         </plugins>
