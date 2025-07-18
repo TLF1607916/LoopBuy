@@ -1,5 +1,11 @@
 package com.shiwu.common.result;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
 /**
  * 统一API响应结果封装
  * @param <T> 数据类型
@@ -8,6 +14,7 @@ public class Result<T> {
     private Boolean success;
     private T data;
     private ErrorInfo error;
+    private String message;
 
     private Result() {
     }
@@ -23,6 +30,31 @@ public class Result<T> {
         result.setSuccess(true);
         result.setData(data);
         return result;
+    }
+
+    /**
+     * 成功返回结果（带消息）
+     * @param data 返回的数据
+     * @param message 成功消息
+     * @param <T> 数据类型
+     * @return 成功的结果对象
+     */
+    public static <T> Result<T> success(T data, String message) {
+        Result<T> result = new Result<>();
+        result.setSuccess(true);
+        result.setData(data);
+        result.setMessage(message);
+        return result;
+    }
+
+    /**
+     * 错误返回结果（简化版）
+     * @param errorMessage 错误信息
+     * @param <T> 数据类型
+     * @return 错误的结果对象
+     */
+    public static <T> Result<T> error(String errorMessage) {
+        return fail("ERROR", errorMessage);
     }
 
     /**
@@ -78,6 +110,27 @@ public class Result<T> {
 
     public void setError(ErrorInfo error) {
         this.error = error;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    /**
+     * 将结果写入HTTP响应
+     * @param response HTTP响应对象
+     * @throws IOException IO异常
+     */
+    public void writeToResponse(HttpServletResponse response) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        String json = mapper.writeValueAsString(this);
+        response.getWriter().write(json);
+        response.getWriter().flush();
     }
 
     /**
