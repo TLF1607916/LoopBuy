@@ -185,7 +185,64 @@ public class UserServiceImpl implements UserService {
             return RegisterResult.fail(RegisterErrorEnum.SYSTEM_ERROR);
         }
     }
-    
+
+    @Override
+    public UserProfileVO getUserProfile(Long userId, Long currentUserId) {
+        // 参数校验
+        if (userId == null) {
+            logger.warn("获取用户公开信息失败: 用户ID为空");
+            return null;
+        }
+
+        try {
+            // 获取用户公开信息
+            User user = userDao.findPublicInfoById(userId);
+            if (user == null) {
+                logger.warn("获取用户公开信息失败: 用户 {} 不存在", userId);
+                return null;
+            }
+
+            // 检查用户状态，被封禁的用户不显示公开信息
+            if (USER_STATUS_BANNED.equals(user.getStatus())) {
+                logger.warn("获取用户公开信息失败: 用户 {} 已被封禁", userId);
+                return null;
+            }
+
+            // 构建UserProfileVO
+            UserProfileVO profileVO = new UserProfileVO();
+
+            // 设置基本用户信息
+            UserVO userVO = new UserVO();
+            userVO.setId(user.getId());
+            userVO.setUsername(user.getUsername());
+            userVO.setNickname(user.getNickname());
+            userVO.setAvatarUrl(user.getAvatarUrl());
+            profileVO.setUser(userVO);
+
+            // 设置统计信息
+            profileVO.setFollowerCount(user.getFollowerCount());
+            profileVO.setAverageRating(user.getAverageRating());
+            profileVO.setRegistrationDate(user.getCreateTime());
+
+            // 获取在售商品列表
+            // 注意：根据模块解耦原则，这里应该调用ProductService而不是直接调用ProductDao
+            // 但由于产品模块还未实现，暂时返回空列表
+            profileVO.setOnSaleProducts(userDao.findOnSaleProductsByUserId(userId));
+
+            // 判断当前用户是否关注了该用户
+            // 注意：这里需要查询user_follow表，但为了遵循模块解耦原则，
+            // 应该有专门的FollowService来处理关注关系
+            // 暂时设置为false
+            profileVO.setIsFollowing(false);
+
+            logger.info("成功获取用户 {} 的公开信息", userId);
+            return profileVO;
+        } catch (Exception e) {
+            logger.error("获取用户公开信息过程发生异常: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
     /**
      * 将User实体转换为UserVO视图对象
      * @param user 用户实体

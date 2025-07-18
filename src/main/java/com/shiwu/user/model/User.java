@@ -1,5 +1,6 @@
 package com.shiwu.user.model;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -11,12 +12,14 @@ public class User {
     private String password;
     private String email;
     private String phone;
-    private Integer status; // 用户状态: 0-正常, 1-已封禁
+    private Integer status; // 用户状态: 0-正常, 1-已封禁, 2-已禁言
     private String avatarUrl;
     private String nickname;
     private Integer gender; // 性别：0-未设置，1-男，2-女
     private String bio;
     private String school;
+    private Integer followerCount; // 粉丝数量
+    private BigDecimal averageRating; // 平均评分（作为卖家）
     private LocalDateTime lastLoginTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
@@ -140,5 +143,21 @@ public class User {
 
     public void setDeleted(Boolean deleted) {
         this.deleted = deleted;
+    }
+
+    public Integer getFollowerCount() {
+        return followerCount;
+    }
+
+    public void setFollowerCount(Integer followerCount) {
+        this.followerCount = followerCount;
+    }
+
+    public BigDecimal getAverageRating() {
+        return averageRating;
+    }
+
+    public void setAverageRating(BigDecimal averageRating) {
+        this.averageRating = averageRating;
     }
 }

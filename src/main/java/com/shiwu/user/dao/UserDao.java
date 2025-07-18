@@ -2,11 +2,15 @@ package com.shiwu.user.dao;
 
 import com.shiwu.common.util.DBUtil;
 import com.shiwu.user.model.User;
+import com.shiwu.user.model.ProductCardVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 用户数据访问对象
@@ -65,7 +69,7 @@ public class UserDao {
      * @return 用户对象，如果不存在则返回null
      */
     public User findById(Long userId) {
-        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, school, last_login_time, create_time, update_time, is_deleted FROM system_user WHERE id = ? AND is_deleted = 0";
+        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, school, follower_count, average_rating, last_login_time, create_time, update_time, is_deleted FROM system_user WHERE id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -90,6 +94,8 @@ public class UserDao {
                 user.setGender(rs.getInt("gender"));
                 user.setBio(rs.getString("bio"));
                 user.setSchool(rs.getString("school"));
+                user.setFollowerCount(rs.getInt("follower_count"));
+                user.setAverageRating(rs.getBigDecimal("average_rating"));
                 user.setLastLoginTime(rs.getObject("last_login_time", LocalDateTime.class));
                 user.setCreateTime(rs.getObject("create_time", LocalDateTime.class));
                 user.setUpdateTime(rs.getObject("update_time", LocalDateTime.class));
@@ -280,6 +286,57 @@ public class UserDao {
         }
         
         return success;
+    }
+
+    /**
+     * 根据用户ID获取用户公开信息（不包含敏感信息）
+     * @param userId 用户ID
+     * @return 用户对象，如果不存在则返回null
+     */
+    public User findPublicInfoById(Long userId) {
+        String sql = "SELECT id, username, nickname, avatar_url, status, follower_count, average_rating, create_time FROM system_user WHERE id = ? AND is_deleted = 0";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        User user = null;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setLong(1, userId);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                user = new User();
+                user.setId(rs.getLong("id"));
+                user.setUsername(rs.getString("username"));
+                user.setNickname(rs.getString("nickname"));
+                user.setAvatarUrl(rs.getString("avatar_url"));
+                user.setStatus(rs.getInt("status"));
+                user.setFollowerCount(rs.getInt("follower_count"));
+                user.setAverageRating(rs.getBigDecimal("average_rating"));
+                user.setCreateTime(rs.getObject("create_time", LocalDateTime.class));
+            }
+        } catch (SQLException e) {
+            logger.error("根据ID查询用户公开信息失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return user;
+    }
+
+    /**
+     * 获取用户的在售商品列表
+     * @param userId 用户ID
+     * @return 在售商品列表
+     */
+    public List<ProductCardVO> findOnSaleProductsByUserId(Long userId) {
+        // 注意：这里暂时返回空列表，因为产品模块还未实现
+        // 当产品模块实现后，应该调用ProductDao的相应方法
+        // 根据模块解耦原则，UserDao不应该直接查询product表
+        logger.warn("获取用户在售商品列表功能暂未实现，需要产品模块支持");
+        return new ArrayList<>();
     }
 
     /**
