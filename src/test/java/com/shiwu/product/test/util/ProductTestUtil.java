@@ -1,4 +1,4 @@
-package com.shiwu.test.util;
+package com.shiwu.product.test.util;
 
 import com.shiwu.product.dao.ProductDao;
 import com.shiwu.product.model.Product;

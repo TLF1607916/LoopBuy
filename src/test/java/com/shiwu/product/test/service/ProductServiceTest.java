@@ -1,4 +1,4 @@
-package com.shiwu.test.service;
+package com.shiwu.product.test.service;
 
 import com.shiwu.product.dao.CategoryDao;
 import com.shiwu.product.dao.ProductDao;

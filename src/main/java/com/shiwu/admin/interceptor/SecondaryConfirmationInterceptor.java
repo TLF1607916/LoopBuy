@@ -25,8 +25,8 @@ import java.util.List;
 @WebFilter(urlPatterns = "/api/admin/*")
 public class SecondaryConfirmationInterceptor implements Filter {
     private static final Logger logger = LoggerFactory.getLogger(SecondaryConfirmationInterceptor.class);
-    
-    private AdminService adminService;
+
+    protected AdminService adminService;
     private ObjectMapper objectMapper;
     
     // 不需要二次确认的路径
@@ -54,7 +54,9 @@ public class SecondaryConfirmationInterceptor implements Filter {
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
-        this.adminService = new AdminServiceImpl();
+        if (this.adminService == null) {
+            this.adminService = new AdminServiceImpl();
+        }
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
         logger.info("二次确认拦截器初始化完成");

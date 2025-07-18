@@ -29,7 +29,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public LoginResult login(String username, String password) {
         // 参数校验
-        if (username == null || password == null) {
+        if (username == null || password == null || username.trim().isEmpty() || password.trim().isEmpty()) {
             logger.warn("登录失败: 用户名或密码为空");
             return LoginResult.fail(LoginErrorEnum.PARAMETER_ERROR);
         }
