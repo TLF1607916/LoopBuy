@@ -1,7 +1,30 @@
+-- ====================================================================
+-- LoopBuy 数据库模式文件 (统一版本)
+-- ====================================================================
+--
+-- 使用说明：
+-- 1. 创建并初始化数据库：
+--    mysql -u root -p -e "CREATE DATABASE shiwu CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; USE shiwu; SOURCE src/main/resources/schema.sql;"
+--
+-- 2. 测试账户：
+--    普通用户: alice/123456, bob/123456, charlie/123456, diana/123456, eve/123456
+--    管理员: admin/admin123 (超级管理员), moderator/admin123 (普通管理员)
+--
+-- 3. 包含的表：
+--    - system_user: 用户表
+--    - user_follow: 用户关注表
+--    - category: 商品分类表
+--    - product: 商品表
+--    - product_image: 商品图片表
+--    - administrator: 管理员表 (新增)
+--    - audit_log: 审计日志表 (新增)
+--
+-- ====================================================================
+
 -- 创建数据库
 CREATE DATABASE IF NOT EXISTS shiwu DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-USE shiwu;
+-- USE shiwu; -- 注释掉，让调用者决定使用哪个数据库
 
 -- 创建用户表
 CREATE TABLE IF NOT EXISTS system_user (
@@ -105,23 +128,23 @@ INSERT INTO user_follow (follower_id, followed_id) VALUES
 
 -- 插入测试分类数据
 INSERT INTO category (name, parent_id) VALUES
-('电子产品', 0),
-('图书教材', 0),
-('服饰鞋包', 0),
-('运动户外', 0),
-('日用百货', 0),
-('手机', 1),
-('电脑', 1),
-('专业书籍', 2),
-('文学小说', 2),
-('运动鞋', 3);
+('Electronics', 0),
+('Books', 0),
+('Fashion', 0),
+('Sports', 0),
+('Daily Goods', 0),
+('Mobile Phones', 1),
+('Computers', 1),
+('Professional Books', 2),
+('Literature', 2),
+('Sports Shoes', 3);
 
 -- 插入测试商品数据
 INSERT INTO product (seller_id, category_id, title, description, price, status) VALUES
-(1, 6, 'iPhone 12 Pro Max', '九成新，256GB，海蓝色', 5999.00, 1),
-(1, 7, 'MacBook Pro 2020', '全新未拆封，M1芯片，13寸', 8999.00, 1),
-(2, 10, '耐克运动鞋', '全新，尺码42，黑色', 399.00, 1),
-(3, 8, '数据结构与算法教材', '几乎全新，有少量笔记', 35.00, 1);
+(1, 6, 'iPhone 12 Pro Max', 'Like new, 256GB, Pacific Blue', 5999.00, 1),
+(1, 7, 'MacBook Pro 2020', 'Brand new, M1 chip, 13 inch', 8999.00, 1),
+(2, 10, 'Nike Sports Shoes', 'Brand new, Size 42, Black', 399.00, 1),
+(3, 8, 'Data Structure Textbook', 'Almost new, with some notes', 35.00, 1);
 
 -- 插入测试商品图片数据
 INSERT INTO product_image (product_id, image_url, is_main) VALUES
@@ -130,3 +153,62 @@ INSERT INTO product_image (product_id, image_url, is_main) VALUES
 (2, 'https://example.com/macbook1.jpg', 1),
 (3, 'https://example.com/nike1.jpg', 1),
 (4, 'https://example.com/book1.jpg', 1);
+
+-- ====================================================================
+-- 管理员系统相关表（新增）
+-- ====================================================================
+
+-- 创建管理员表
+CREATE TABLE IF NOT EXISTS administrator (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '管理员ID',
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT '管理员用户名',
+    password VARCHAR(255) NOT NULL COMMENT '密码（BCrypt加密）',
+    email VARCHAR(100) COMMENT '邮箱',
+    real_name VARCHAR(50) COMMENT '真实姓名',
+    role VARCHAR(20) NOT NULL DEFAULT 'ADMIN' COMMENT '角色：ADMIN-普通管理员，SUPER_ADMIN-超级管理员',
+    status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+    last_login_time DATETIME COMMENT '最后登录时间',
+    login_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '登录次数',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除：0-未删除，1-已删除',
+
+    INDEX idx_username (username),
+    INDEX idx_email (email),
+    INDEX idx_status (status),
+    INDEX idx_is_deleted (is_deleted),
+    INDEX idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员表';
+
+-- 创建审计日志表
+CREATE TABLE IF NOT EXISTS audit_log (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '日志ID',
+    admin_id BIGINT UNSIGNED NOT NULL COMMENT '管理员ID',
+    action VARCHAR(100) NOT NULL COMMENT '操作类型',
+    target_type VARCHAR(50) COMMENT '操作目标类型（USER、PRODUCT等）',
+    target_id BIGINT UNSIGNED COMMENT '操作目标ID',
+    details TEXT COMMENT '操作详情（JSON格式）',
+    ip_address VARCHAR(45) COMMENT 'IP地址（支持IPv6）',
+    user_agent VARCHAR(500) COMMENT '用户代理',
+    result TINYINT NOT NULL DEFAULT 1 COMMENT '操作结果：0-失败，1-成功',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+
+    INDEX idx_admin_id (admin_id),
+    INDEX idx_action (action),
+    INDEX idx_target_type (target_type),
+    INDEX idx_target_id (target_id),
+    INDEX idx_create_time (create_time),
+    INDEX idx_result (result),
+
+    FOREIGN KEY (admin_id) REFERENCES administrator(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='审计日志表';
+
+-- ====================================================================
+-- 管理员测试数据（新增）
+-- ====================================================================
+
+-- 插入管理员测试数据
+-- Password: admin123, BCrypt encrypted
+INSERT INTO administrator (username, password, email, real_name, role, status, login_count) VALUES
+('admin', '$2a$10$zET/DZxiY3ZIElkyQth62u6rmqttBv62/bK0C1.vqw41zH.F9bfA6', 'admin@shiwu.com', 'System Administrator', 'SUPER_ADMIN', 1, 0),
+('moderator', '$2a$10$zET/DZxiY3ZIElkyQth62u6rmqttBv62/bK0C1.vqw41zH.F9bfA6', 'moderator@shiwu.com', 'Content Moderator', 'ADMIN', 1, 0);
