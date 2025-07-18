@@ -104,7 +104,21 @@ CREATE TABLE IF NOT EXISTS product_image (
     FOREIGN KEY (product_id) REFERENCES product(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品图片表';
 
-
+-- 创建购物车表
+CREATE TABLE IF NOT EXISTS shopping_cart (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    product_id BIGINT UNSIGNED NOT NULL COMMENT '商品ID',
+    quantity INT UNSIGNED NOT NULL DEFAULT 1 COMMENT '商品数量（本项目固定为1）',
+    is_deleted TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '逻辑删除标志（0：未删除，1：已删除）',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_user_id_product_id (user_id, product_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_product_id (product_id),
+    FOREIGN KEY (user_id) REFERENCES system_user(id),
+    FOREIGN KEY (product_id) REFERENCES product(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='购物车表';
 
 
 -- 插入测试用户数据（密码为123456的BCrypt哈希值）
