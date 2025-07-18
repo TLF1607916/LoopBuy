@@ -23,7 +23,7 @@
 
 -- 创建数据库
 CREATE DATABASE IF NOT EXISTS shiwu DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
+USE shiwu;
 -- USE shiwu; -- 注释掉，让调用者决定使用哪个数据库
 
 -- 创建用户表

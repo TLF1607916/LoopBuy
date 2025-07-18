@@ -115,19 +115,35 @@ public class CoreFollowTest {
     @Test
     public void test5_UnfollowUser() {
         System.out.println("测试5: 取关用户");
-        
+
         Long followerId = 1L;  // alice
         Long followedId = 2L;  // bob
-        
+
         // 检查当前状态
         boolean currentState = userFollowDao.isFollowing(followerId, followedId);
         System.out.println("当前关注状态: " + currentState);
-        
+
+        if (!currentState) {
+            // 如果当前未关注，先建立关注关系
+            System.out.println("当前未关注，先建立关注关系");
+            boolean followResult = userFollowDao.followUser(followerId, followedId);
+            System.out.println("建立关注关系结果: " + followResult);
+
+            if (!followResult) {
+                System.out.println("⚠️ 无法建立关注关系，跳过取关测试");
+                return;
+            }
+
+            // 重新检查状态
+            currentState = userFollowDao.isFollowing(followerId, followedId);
+            System.out.println("建立关注后状态: " + currentState);
+        }
+
         if (currentState) {
             // 执行取关操作
             boolean result = userFollowDao.unfollowUser(followerId, followedId);
             System.out.println("取关操作结果: " + result);
-            
+
             if (result) {
                 // 验证取关状态
                 boolean afterUnfollow = userFollowDao.isFollowing(followerId, followedId);
@@ -139,7 +155,7 @@ public class CoreFollowTest {
                 fail("取关操作应该成功");
             }
         } else {
-            System.out.println("⚠️ 当前未关注，无法测试取关功能");
+            System.out.println("⚠️ 无法建立关注关系，跳过取关测试");
         }
     }
     

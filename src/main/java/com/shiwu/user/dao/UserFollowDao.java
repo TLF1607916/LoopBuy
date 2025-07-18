@@ -124,7 +124,7 @@ public class UserFollowDao {
             return false;
         }
 
-        String sql = "UPDATE user_follow SET is_deleted = 1, updated_at = ? WHERE follower_id = ? AND followed_id = ? AND is_deleted = 0";
+        String sql = "UPDATE user_follow SET is_deleted = 1 WHERE follower_id = ? AND followed_id = ? AND is_deleted = 0";
         logger.info("执行SQL: {}", sql);
 
         Connection conn = null;
@@ -138,9 +138,8 @@ public class UserFollowDao {
             }
 
             pstmt = conn.prepareStatement(sql);
-            pstmt.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
-            pstmt.setLong(2, followerId);
-            pstmt.setLong(3, followedId);
+            pstmt.setLong(1, followerId);
+            pstmt.setLong(2, followedId);
 
             logger.info("执行UPDATE操作...");
             int rowsAffected = pstmt.executeUpdate();

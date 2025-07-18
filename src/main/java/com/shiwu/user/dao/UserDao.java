@@ -26,7 +26,7 @@ public class UserDao {
      * @return 用户对象，如果不存在则返回null
      */
     public User findByUsername(String username) {
-        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, follower_count, average_rating, last_login_time FROM system_user WHERE username = ? AND is_deleted = 0";
+        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, follower_count, average_rating, last_login_time, create_time FROM system_user WHERE username = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -53,6 +53,7 @@ public class UserDao {
                 user.setFollowerCount(rs.getInt("follower_count"));
                 user.setAverageRating(rs.getBigDecimal("average_rating"));
                 user.setLastLoginTime(rs.getObject("last_login_time", LocalDateTime.class));
+                user.setCreateTime(rs.getObject("create_time", LocalDateTime.class));
             }
         } catch (SQLException e) {
             logger.error("查询用户失败: {}", e.getMessage(), e);
@@ -69,7 +70,7 @@ public class UserDao {
      * @return 用户对象，如果不存在则返回null
      */
     public User findById(Long userId) {
-        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, follower_count, average_rating, last_login_time FROM system_user WHERE id = ? AND is_deleted = 0";
+        String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, follower_count, average_rating, last_login_time, create_time FROM system_user WHERE id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -96,6 +97,7 @@ public class UserDao {
                 user.setFollowerCount(rs.getInt("follower_count"));
                 user.setAverageRating(rs.getBigDecimal("average_rating"));
                 user.setLastLoginTime(rs.getObject("last_login_time", LocalDateTime.class));
+                user.setCreateTime(rs.getObject("create_time", LocalDateTime.class));
             }
         } catch (SQLException e) {
             logger.error("根据ID查询用户失败: {}", e.getMessage(), e);

@@ -177,7 +177,8 @@ public class DashboardServiceTest {
         when(mockUserDao.getNewUserCount(any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(5L)  // 今日新增
             .thenReturn(20L) // 本周新增
-            .thenReturn(60L) // 本月新增
+            .thenReturn(60L) // 本月新增（第一次调用）
+            .thenReturn(60L) // 本月新增（第二次调用，用于增长率计算）
             .thenReturn(40L); // 上月新增
         when(mockUserDao.getUserCountByStatus(1)).thenReturn(3L); // 封禁用户
         when(mockUserDao.getUserCountByStatus(2)).thenReturn(2L); // 禁言用户
@@ -212,9 +213,10 @@ public class DashboardServiceTest {
 
         // 设置商品统计相关的mock
         when(mockProductDao.getNewProductCount(any(LocalDateTime.class), any(LocalDateTime.class)))
-            .thenReturn(8L)  // 今日新增
-            .thenReturn(30L) // 本周新增
-            .thenReturn(100L) // 本月新增
+            .thenReturn(8L)   // 今日新增
+            .thenReturn(30L)  // 本周新增
+            .thenReturn(100L) // 本月新增（第一次调用）
+            .thenReturn(100L) // 本月新增（第二次调用，用于增长率计算）
             .thenReturn(80L); // 上月新增
         when(mockProductDao.getProductCountByStatus(Product.STATUS_ONSALE)).thenReturn(150L);
         when(mockProductDao.getProductCountByStatus(Product.STATUS_SOLD)).thenReturn(25L);
@@ -249,7 +251,10 @@ public class DashboardServiceTest {
         // Given: 重置所有mock，设置特定的趋势数据
         reset(mockUserDao, mockProductDao, mockAuditLogDao, mockFollowDao);
 
-        // 模拟趋势数据
+        // 设置其他必要的mock（使用默认值）
+        setupBasicMockReturns();
+
+        // 模拟趋势数据（在基础mock之后设置，避免被覆盖）
         List<Map<String, Object>> userTrendData = new ArrayList<>();
         Map<String, Object> trendItem = new HashMap<>();
         trendItem.put("date", "2024-01-01");
@@ -259,9 +264,6 @@ public class DashboardServiceTest {
         when(mockUserDao.getUserGrowthTrend(30)).thenReturn(userTrendData);
         when(mockProductDao.getProductGrowthTrend(30)).thenReturn(new ArrayList<>());
         when(mockAuditLogDao.getActivityTrend(30)).thenReturn(new ArrayList<>());
-
-        // 设置其他必要的mock（使用默认值）
-        setupBasicMockReturns();
 
         // When: 获取统计数据
         DashboardStatsVO stats = dashboardService.getDashboardStats();
@@ -307,7 +309,8 @@ public class DashboardServiceTest {
         when(mockUserDao.getNewUserCount(any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(5L)  // 今日新增
             .thenReturn(20L) // 本周新增
-            .thenReturn(10L) // 本月新增（当前值）
+            .thenReturn(10L) // 本月新增（第一次调用）
+            .thenReturn(10L) // 本月新增（第二次调用，用于增长率计算）
             .thenReturn(0L); // 上月新增（之前值为0）
 
         // 设置其他必要的mock（使用默认值）
@@ -336,7 +339,8 @@ public class DashboardServiceTest {
         // 商品相关mock
         when(mockProductDao.getTotalProductCount()).thenReturn(200L);
         when(mockProductDao.getProductCountByStatus(Product.STATUS_PENDING_REVIEW)).thenReturn(10L);
-        when(mockProductDao.getProductCountByStatus(anyInt())).thenReturn(20L);
+        when(mockProductDao.getProductCountByStatus(Product.STATUS_ONSALE)).thenReturn(150L);
+        when(mockProductDao.getProductCountByStatus(Product.STATUS_DELISTED)).thenReturn(40L);
         when(mockProductDao.getNewProductCount(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(15L);
         when(mockProductDao.getProductGrowthTrend(anyInt())).thenReturn(new ArrayList<>());
 
