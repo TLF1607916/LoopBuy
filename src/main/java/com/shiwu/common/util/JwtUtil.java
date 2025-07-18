@@ -31,33 +31,48 @@ public class JwtUtil {
     
     /**
      * 生成JWT令牌
-     * 
+     *
      * @param userId 用户ID
      * @param username 用户名
      * @return 生成的JWT令牌
      */
     public static String generateToken(Long userId, String username) {
+        return generateToken(userId, username, null);
+    }
+
+    /**
+     * 生成JWT令牌（支持角色信息）
+     *
+     * @param userId 用户ID
+     * @param username 用户名
+     * @param role 角色（可为null）
+     * @return 生成的JWT令牌
+     */
+    public static String generateToken(Long userId, String username, String role) {
         if (userId == null || username == null) {
             logger.error("生成JWT令牌失败: 用户ID或用户名为空");
             return null;
         }
-        
+
         try {
             Date now = new Date();
             Date expiration = new Date(now.getTime() + TOKEN_VALIDITY);
-            
+
             // 设置JWT声明
             Map<String, Object> claims = new HashMap<>();
             claims.put("userId", userId);
             claims.put("username", username);
-            
+            if (role != null) {
+                claims.put("role", role);
+            }
+
             // 构建JWT
             JwtBuilder builder = Jwts.builder()
                     .setClaims(claims)
                     .setIssuedAt(now)
                     .setExpiration(expiration)
                     .signWith(SECRET_KEY);
-            
+
             logger.info("为用户 {} 生成JWT令牌成功", username);
             return builder.compact();
         } catch (Exception e) {
@@ -79,13 +94,27 @@ public class JwtUtil {
     
     /**
      * 从JWT令牌中获取用户名
-     * 
+     *
      * @param token JWT令牌
      * @return 用户名，如果令牌无效则返回null
      */
     public static String getUsernameFromToken(String token) {
         Claims claims = getClaimsFromToken(token);
         return claims != null ? claims.get("username").toString() : null;
+    }
+
+    /**
+     * 从JWT令牌中获取角色
+     *
+     * @param token JWT令牌
+     * @return 角色，如果令牌无效或没有角色信息则返回null
+     */
+    public static String getRoleFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        if (claims != null && claims.get("role") != null) {
+            return claims.get("role").toString();
+        }
+        return null;
     }
     
     /**

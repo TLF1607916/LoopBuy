@@ -28,7 +28,8 @@ public class JwtInterceptor implements Filter {
     // 不需要验证Token的路径
     private static final List<String> WHITE_LIST = Arrays.asList(
             "/api/user/login",
-            "/api/user/register"
+            "/api/user/register",
+            "/api/admin/login"
     );
     
     @Override
@@ -68,11 +69,22 @@ public class JwtInterceptor implements Filter {
             return;
         }
         
-        // 从Token中获取用户ID，并将其设置到请求属性中
+        // 从Token中获取用户ID和角色信息，并将其设置到请求属性中
         Long userId = JwtUtil.getUserIdFromToken(token);
+        String role = JwtUtil.getRoleFromToken(token);
         request.setAttribute("userId", userId);
-        
-        logger.info("用户 {} 的Token验证通过", userId);
+        request.setAttribute("userRole", role);
+
+        // 检查管理员路径的权限
+        if (requestURI.startsWith("/api/admin/") && !requestURI.equals("/api/admin/login")) {
+            if (role == null || (!role.equals("ADMIN") && !role.equals("SUPER_ADMIN"))) {
+                logger.warn("请求 {} 被拒绝: 用户 {} 没有管理员权限", requestURI, userId);
+                sendForbiddenResponse(response, "需要管理员权限");
+                return;
+            }
+        }
+
+        logger.info("用户 {} 的Token验证通过, 角色: {}", userId, role);
         chain.doFilter(request, response);
     }
     
@@ -83,15 +95,29 @@ public class JwtInterceptor implements Filter {
     
     /**
      * 发送未授权响应
-     * 
+     *
      * @param response 响应对象
      * @param message 错误信息
      */
     private void sendUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json;charset=UTF-8");
-        
+
         Result<?> result = Result.fail("UNAUTHORIZED", message);
+        response.getWriter().write(objectMapper.writeValueAsString(result));
+    }
+
+    /**
+     * 发送禁止访问响应
+     *
+     * @param response 响应对象
+     * @param message 错误信息
+     */
+    private void sendForbiddenResponse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json;charset=UTF-8");
+
+        Result<?> result = Result.fail("FORBIDDEN", message);
         response.getWriter().write(objectMapper.writeValueAsString(result));
     }
     

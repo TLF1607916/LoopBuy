@@ -40,6 +40,22 @@ public class Result<T> {
         return result;
     }
 
+    /**
+     * 失败返回结果（带用户提示）
+     * @param errorCode 错误码
+     * @param errorMessage 错误信息
+     * @param userTip 用户提示信息
+     * @param <T> 数据类型
+     * @return 失败的结果对象
+     */
+    public static <T> Result<T> fail(String errorCode, String errorMessage, String userTip) {
+        Result<T> result = new Result<>();
+        result.setSuccess(false);
+        ErrorInfo errorInfo = new ErrorInfo(errorCode, errorMessage, userTip);
+        result.setError(errorInfo);
+        return result;
+    }
+
     public Boolean getSuccess() {
         return success;
     }
@@ -70,10 +86,17 @@ public class Result<T> {
     public static class ErrorInfo {
         private String code;
         private String message;
+        private String userTip;
 
         public ErrorInfo(String code, String message) {
             this.code = code;
             this.message = message;
+        }
+
+        public ErrorInfo(String code, String message, String userTip) {
+            this.code = code;
+            this.message = message;
+            this.userTip = userTip;
         }
 
         public String getCode() {
@@ -90,6 +113,14 @@ public class Result<T> {
 
         public void setMessage(String message) {
             this.message = message;
+        }
+
+        public String getUserTip() {
+            return userTip;
+        }
+
+        public void setUserTip(String userTip) {
+            this.userTip = userTip;
         }
     }
 }
