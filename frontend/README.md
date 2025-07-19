@@ -4,12 +4,21 @@
 
 ## 功能特性
 
+### 核心功能
 - 管理员登录功能
+- 数据仪表盘（使用ECharts图表库）
 - JWT Token认证
 - 响应式设计
 - 错误处理和用户反馈
 - 路由保护
 - 现代化UI设计
+
+### 仪表盘功能
+- 实时统计数据展示（用户、商品、交易等）
+- 趋势分析图表（用户注册、商品发布、交易量）
+- 分布统计图表（商品分类、用户活跃度）
+- 热门商品排行榜
+- 数据自动刷新和手动刷新
 
 ## 技术栈
 
@@ -18,6 +27,7 @@
 - Vite
 - React Router DOM
 - Axios
+- ECharts 5.4.2 + echarts-for-react
 - CSS3
 
 ## 项目结构
@@ -25,6 +35,17 @@
 ```
 src/
 ├── components/          # 可复用组件
+│   ├── charts/         # 图表组件
+│   │   ├── BaseChart.tsx
+│   │   ├── LineChart.tsx
+│   │   ├── PieChart.tsx
+│   │   ├── BarChart.tsx
+│   │   └── charts.css
+│   ├── dashboard/      # 仪表盘组件
+│   │   ├── DashboardLayout.tsx
+│   │   ├── DashboardLayout.css
+│   │   ├── StatCard.tsx
+│   │   └── StatCard.css
 │   └── ProtectedRoute.tsx
 ├── contexts/           # React上下文
 │   └── AuthContext.tsx
@@ -34,9 +55,11 @@ src/
 │   ├── DashboardPage.tsx
 │   └── DashboardPage.css
 ├── services/           # API服务
-│   └── api.ts
+│   ├── api.ts
+│   └── dashboardApi.ts
 ├── types/              # TypeScript类型定义
-│   └── auth.ts
+│   ├── auth.ts
+│   └── dashboard.ts
 ├── App.tsx
 ├── App.css
 ├── main.tsx
