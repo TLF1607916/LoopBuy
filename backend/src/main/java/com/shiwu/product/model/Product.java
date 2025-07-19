@@ -24,6 +24,7 @@ public class Product {
     public static final Integer STATUS_SOLD = 2;          // 已售出
     public static final Integer STATUS_DELISTED = 3;      // 已下架
     public static final Integer STATUS_DRAFT = 4;         // 草稿
+    public static final Integer STATUS_LOCKED = 5;        // 锁定（有用户下单但未付款）
 
     public Long getId() {
         return id;
