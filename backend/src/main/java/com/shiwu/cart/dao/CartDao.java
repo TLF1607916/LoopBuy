@@ -3,7 +3,7 @@ package com.shiwu.cart.dao;
 import com.shiwu.cart.model.CartItem;
 import com.shiwu.cart.model.CartItemVO;
 import com.shiwu.common.util.DBUtil;
-import com.shiwu.user.model.ProductCardVO;
+import com.shiwu.product.model.ProductCardVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,7 +115,7 @@ public class CartDao {
 
                 // 创建商品信息
                 ProductCardVO product = new ProductCardVO();
-                product.setProductId(rs.getLong("product_id"));
+                product.setId(rs.getLong("product_id"));
                 product.setTitle(rs.getString("title"));
                 product.setPrice(rs.getBigDecimal("price"));
                 product.setMainImageUrl(rs.getString("main_image_url"));

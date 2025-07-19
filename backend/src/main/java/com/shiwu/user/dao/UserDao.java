@@ -2,7 +2,7 @@ package com.shiwu.user.dao;
 
 import com.shiwu.common.util.DBUtil;
 import com.shiwu.user.model.User;
-import com.shiwu.user.model.ProductCardVO;
+import com.shiwu.product.model.ProductCardVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

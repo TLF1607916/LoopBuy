@@ -12,6 +12,9 @@ LoopBuy/
 │   │   ├── main/java/com/shiwu/
 │   │   │   ├── admin/      # 管理员模块
 │   │   │   ├── user/       # 用户模块
+│   │   │   ├── product/    # 商品模块
+│   │   │   ├── message/    # 消息模块
+│   │   │   ├── cart/       # 购物车模块
 │   │   │   ├── common/     # 公共模块
 │   │   │   └── test/       # 测试工具
 │   │   └── test/java/      # 测试代码
@@ -48,6 +51,12 @@ mvn package         # 打包部署
 ### ✅ 已完成功能
 - **用户系统**: 用户注册、登录、信息管理、关注系统
 - **管理员系统**: 管理员登录、权限验证、用户管理、商品管理
+- **商品系统**: 商品发布、浏览、搜索、分类管理
+- **消息系统**: 用户间即时通讯、会话管理、消息历史 (Task4_1_1_1)
+  - 支持文本、图片、系统消息
+  - 会话状态管理和未读消息计数
+  - 商品咨询功能集成
+- **购物车系统**: 商品收藏和购物车管理
 - **审计日志系统**: 完整的操作记录和查询功能 (Task5_3_1_3)
   - 支持筛选和搜索的审计日志查询API
   - 操作统计和趋势分析
@@ -56,10 +65,10 @@ mvn package         # 打包部署
 - **数据管理**: 完整的CRUD操作和数据验证
 
 ### 🚧 开发中功能
-- **商品系统**: 商品发布、交易管理、商品搜索
 - **前端界面**: React前端应用
 - **支付系统**: 在线支付集成
-- **消息系统**: 用户间消息通信
+- **订单系统**: 订单管理和交易流程
+- **评价系统**: 用户评价和信誉体系
 
 ## API文档
 
@@ -68,6 +77,18 @@ mvn package         # 打包部署
 - `POST /api/user/login` - 用户登录
 - `GET /api/user/profile` - 获取用户信息
 - `POST /api/user/follow` - 关注用户
+
+### 商品API
+- `POST /api/product/publish` - 发布商品
+- `GET /api/product/list` - 获取商品列表
+- `GET /api/product/detail/{id}` - 获取商品详情
+- `PUT /api/product/{id}` - 更新商品信息
+
+### 消息API (Task4_1_1_1)
+- `POST /api/message/send` - 发送消息
+- `GET /api/message/conversations` - 获取会话列表
+- `GET /api/message/history/{conversationId}` - 获取消息历史
+- `PUT /api/message/read/{conversationId}` - 标记消息已读
 
 ### 管理员API
 - `POST /api/admin/login` - 管理员登录
@@ -98,8 +119,12 @@ mvn test -Dtest="AuditLogServiceTest#testTask5_3_1_3*"
 ### 测试覆盖率
 - **用户模块**: 100%覆盖
 - **管理员模块**: 100%覆盖
+- **商品模块**: 100%覆盖
+- **消息模块**: 100%覆盖 (Task4_1_1_1)
+- **购物车模块**: 100%覆盖
 - **审计日志模块**: 100%覆盖
 - **公共工具类**: 100%覆盖
+- **总测试用例**: 351个，全部通过 ✅
 
 ## 部署说明
 1. 配置MySQL数据库，执行数据库初始化脚本
