@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 用户关注数据访问对象
@@ -276,6 +278,47 @@ public class UserFollowDao {
         return userFollow;
     }
     
+    /**
+     * 获取用户的粉丝ID列表
+     * 用于Task4_2_1_2: 商品审核通过粉丝通知功能
+     *
+     * @param userId 用户ID
+     * @return 粉丝ID列表
+     */
+    public List<Long> getFollowerIds(Long userId) {
+        if (userId == null) {
+            logger.warn("获取粉丝ID列表失败: 用户ID为空");
+            return new ArrayList<>();
+        }
+
+        String sql = "SELECT follower_id FROM user_follow WHERE followed_id = ? AND is_deleted = 0";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setLong(1, userId);
+
+            rs = pstmt.executeQuery();
+
+            List<Long> followerIds = new ArrayList<>();
+            while (rs.next()) {
+                followerIds.add(rs.getLong("follower_id"));
+            }
+
+            logger.debug("获取粉丝ID列表成功: userId={}, count={}", userId, followerIds.size());
+            return followerIds;
+
+        } catch (SQLException e) {
+            logger.error("获取粉丝ID列表失败: userId={}, error={}", userId, e.getMessage(), e);
+            return new ArrayList<>();
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+    }
+
     /**
      * 关闭数据库资源
      */

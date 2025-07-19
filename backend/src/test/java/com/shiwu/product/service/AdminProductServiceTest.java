@@ -7,6 +7,7 @@ import com.shiwu.product.dao.AdminProductDao;
 import com.shiwu.product.dao.ProductDao;
 import com.shiwu.product.model.Product;
 import com.shiwu.product.service.impl.AdminProductServiceImpl;
+import com.shiwu.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -35,14 +36,17 @@ public class AdminProductServiceTest {
     
     @Mock
     private AuditLogService auditLogService;
-    
+
+    @Mock
+    private NotificationService notificationService;
+
     private AdminProductService adminProductService;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
         // 使用支持依赖注入的构造函数
-        adminProductService = new AdminProductServiceImpl(adminProductDao, productDao, auditLogService);
+        adminProductService = new AdminProductServiceImpl(adminProductDao, productDao, auditLogService, notificationService);
     }
     
     /**
