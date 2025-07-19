@@ -120,6 +120,59 @@ CREATE TABLE IF NOT EXISTS shopping_cart (
     FOREIGN KEY (product_id) REFERENCES product(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='购物车表';
 
+-- 创建订单表
+CREATE TABLE IF NOT EXISTS trade_order (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '订单ID',
+    buyer_id BIGINT UNSIGNED NOT NULL COMMENT '买家用户ID',
+    seller_id BIGINT UNSIGNED NOT NULL COMMENT '卖家用户ID',
+    product_id BIGINT UNSIGNED NOT NULL COMMENT '商品ID',
+    price_at_purchase DECIMAL(10,2) NOT NULL COMMENT '购买时的商品价格（快照）',
+    product_title_snapshot VARCHAR(100) NOT NULL COMMENT '商品标题快照',
+    product_description_snapshot TEXT COMMENT '商品描述快照',
+    product_image_urls_snapshot TEXT COMMENT '商品图片URL列表快照（JSON格式）',
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '订单状态：0-待付款，1-待发货，2-已发货，3-已完成，4-已取消，5-申请退货，6-已退货',
+    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除：0-未删除，1-已删除',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    INDEX idx_buyer_id_status (buyer_id, status),
+    INDEX idx_seller_id_status (seller_id, status),
+    INDEX idx_product_id (product_id),
+    INDEX idx_status (status),
+    INDEX idx_create_time (create_time),
+
+    FOREIGN KEY (buyer_id) REFERENCES system_user(id),
+    FOREIGN KEY (seller_id) REFERENCES system_user(id),
+    FOREIGN KEY (product_id) REFERENCES product(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
+
+-- 创建支付表
+CREATE TABLE IF NOT EXISTS payment (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '支付记录ID',
+    payment_id VARCHAR(64) NOT NULL UNIQUE COMMENT '支付流水号（唯一标识）',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    order_ids TEXT NOT NULL COMMENT '订单ID列表（JSON格式）',
+    payment_amount DECIMAL(10,2) NOT NULL COMMENT '支付金额',
+    payment_method TINYINT NOT NULL COMMENT '支付方式：1-支付宝，2-微信支付，3-银行卡',
+    payment_status TINYINT NOT NULL DEFAULT 0 COMMENT '支付状态：0-待支付，1-支付成功，2-支付失败，3-支付取消，4-支付超时',
+    third_party_transaction_id VARCHAR(128) COMMENT '第三方交易号',
+    failure_reason VARCHAR(255) COMMENT '失败原因',
+    payment_time DATETIME COMMENT '支付完成时间',
+    expire_time DATETIME NOT NULL COMMENT '支付超时时间',
+    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除：0-未删除，1-已删除',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    INDEX idx_payment_id (payment_id),
+    INDEX idx_user_id_status (user_id, payment_status),
+    INDEX idx_payment_status (payment_status),
+    INDEX idx_expire_time (expire_time),
+    INDEX idx_create_time (create_time),
+
+    FOREIGN KEY (user_id) REFERENCES system_user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付记录表';
+
+
 
 -- 插入测试用户数据（密码为123456的BCrypt哈希值）
 -- BCrypt哈希会随机生成盐值，因此每次生成的哈希值都不同
