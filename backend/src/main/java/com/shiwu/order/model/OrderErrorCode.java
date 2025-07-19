@@ -53,5 +53,44 @@ public class OrderErrorCode {
     public static final String MSG_ORDER_STATUS_NOT_SHIPPED = "订单状态不正确，只有已发货状态的订单才能确认收货";
     public static final String MSG_CONFIRM_RECEIPT_FAILED = "确认收货失败，请稍后重试";
     public static final String MSG_UPDATE_PRODUCT_TO_SOLD_FAILED = "更新商品状态为已售失败";
+
+    // 退货相关错误码
+    public static final String RETURN_REQUEST_INVALID_REASON = "ORDER_301";
+    public static final String RETURN_REQUEST_REASON_TOO_LONG = "ORDER_302";
+    public static final String RETURN_REQUEST_ORDER_NOT_COMPLETED = "ORDER_303";
+    public static final String RETURN_REQUEST_TIME_EXPIRED = "ORDER_304";
+    public static final String RETURN_REQUEST_PERMISSION_DENIED = "ORDER_305";
+    public static final String RETURN_REQUEST_ALREADY_APPLIED = "ORDER_306";
+    public static final String RETURN_REQUEST_ORDER_ALREADY_REVIEWED = "ORDER_307";
+    public static final String APPLY_RETURN_FAILED = "ORDER_308";
+
+    // 退货相关错误信息
+    public static final String MSG_RETURN_REQUEST_INVALID_REASON = "退货原因不能为空";
+    public static final String MSG_RETURN_REQUEST_REASON_TOO_LONG = "退货原因不能超过500个字符";
+    public static final String MSG_RETURN_REQUEST_ORDER_NOT_COMPLETED = "只有已完成的订单才能申请退货";
+    public static final String MSG_RETURN_REQUEST_TIME_EXPIRED = "申请退货时间已过期，只能在订单完成后7天内申请";
+    public static final String MSG_RETURN_REQUEST_PERMISSION_DENIED = "无权限申请退货此订单，只有买家可以申请退货";
+    public static final String MSG_RETURN_REQUEST_ALREADY_APPLIED = "该订单已经申请过退货";
+    public static final String MSG_RETURN_REQUEST_ORDER_ALREADY_REVIEWED = "已评价的订单不能申请退货";
+    public static final String MSG_APPLY_RETURN_FAILED = "申请退货失败，请稍后重试";
+
+    // 退货处理相关错误码
+    public static final String PROCESS_RETURN_INVALID_DECISION = "ORDER_401";
+    public static final String PROCESS_RETURN_MISSING_REJECT_REASON = "ORDER_402";
+    public static final String PROCESS_RETURN_REJECT_REASON_TOO_LONG = "ORDER_403";
+    public static final String PROCESS_RETURN_ORDER_NOT_RETURN_REQUESTED = "ORDER_404";
+    public static final String PROCESS_RETURN_PERMISSION_DENIED = "ORDER_405";
+    public static final String PROCESS_RETURN_FAILED = "ORDER_406";
+    public static final String SIMULATE_REFUND_FAILED = "ORDER_407";
+
+    // 退货处理相关错误信息
+    public static final String MSG_PROCESS_RETURN_INVALID_DECISION = "处理决定不能为空";
+    public static final String MSG_PROCESS_RETURN_MISSING_REJECT_REASON = "拒绝退货时必须填写拒绝原因";
+    public static final String MSG_PROCESS_RETURN_REJECT_REASON_TOO_LONG = "拒绝原因不能超过500个字符";
+    public static final String MSG_PROCESS_RETURN_ORDER_NOT_RETURN_REQUESTED = "只有申请退货状态的订单才能处理";
+    public static final String MSG_PROCESS_RETURN_PERMISSION_DENIED = "无权限处理此退货申请，只有卖家可以处理";
+    public static final String MSG_PROCESS_RETURN_FAILED = "处理退货申请失败，请稍后重试";
+    public static final String MSG_SIMULATE_REFUND_FAILED = "模拟退款操作失败";
+
     public static final String MSG_SYSTEM_ERROR = "系统错误，请稍后重试";
 }
