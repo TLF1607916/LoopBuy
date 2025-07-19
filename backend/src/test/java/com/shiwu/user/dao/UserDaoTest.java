@@ -1,7 +1,7 @@
 package com.shiwu.user.dao;
 
 import com.shiwu.user.model.User;
-import com.shiwu.user.model.ProductCardVO;
+import com.shiwu.product.model.ProductCardVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

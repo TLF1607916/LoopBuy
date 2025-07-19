@@ -230,8 +230,8 @@ public class CartServiceTest {
         item1.setQuantity(1);
         item1.setAvailable(true);
 
-        com.shiwu.user.model.ProductCardVO product1 = new com.shiwu.user.model.ProductCardVO();
-        product1.setProductId(1L);
+        com.shiwu.product.model.ProductCardVO product1 = new com.shiwu.product.model.ProductCardVO();
+        product1.setId(1L);
         product1.setPrice(new BigDecimal("99.99"));
         item1.setProduct(product1);
 
@@ -285,8 +285,8 @@ public class CartServiceTest {
         availableItem.setQuantity(1);
         availableItem.setAvailable(true);
 
-        com.shiwu.user.model.ProductCardVO availableProduct = new com.shiwu.user.model.ProductCardVO();
-        availableProduct.setProductId(1L);
+        com.shiwu.product.model.ProductCardVO availableProduct = new com.shiwu.product.model.ProductCardVO();
+        availableProduct.setId(1L);
         availableProduct.setPrice(new BigDecimal("50.00"));
         availableItem.setProduct(availableProduct);
 
@@ -296,8 +296,8 @@ public class CartServiceTest {
         unavailableItem.setQuantity(1);
         unavailableItem.setAvailable(false);
 
-        com.shiwu.user.model.ProductCardVO unavailableProduct = new com.shiwu.user.model.ProductCardVO();
-        unavailableProduct.setProductId(2L);
+        com.shiwu.product.model.ProductCardVO unavailableProduct = new com.shiwu.product.model.ProductCardVO();
+        unavailableProduct.setId(2L);
         unavailableProduct.setPrice(new BigDecimal("30.00"));
         unavailableItem.setProduct(unavailableProduct);
 

@@ -1,6 +1,6 @@
 package com.shiwu.cart.model;
 
-import com.shiwu.user.model.ProductCardVO;
+import com.shiwu.product.model.ProductCardVO;
 
 /**
  * 购物车项视图对象

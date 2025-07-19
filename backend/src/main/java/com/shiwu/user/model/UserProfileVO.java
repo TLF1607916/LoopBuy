@@ -1,5 +1,6 @@
 package com.shiwu.user.model;
 
+import com.shiwu.product.model.ProductCardVO;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
