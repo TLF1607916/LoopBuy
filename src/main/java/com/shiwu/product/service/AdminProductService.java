@@ -29,33 +29,41 @@ public interface AdminProductService {
      * @param productId 商品ID
      * @param adminId 管理员ID
      * @param reason 审核备注
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作是否成功
      */
-    boolean approveProduct(Long productId, Long adminId, String reason);
-    
+    boolean approveProduct(Long productId, Long adminId, String reason, String ipAddress, String userAgent);
+
     /**
      * 审核拒绝商品
      * @param productId 商品ID
      * @param adminId 管理员ID
      * @param reason 拒绝原因
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作是否成功
      */
-    boolean rejectProduct(Long productId, Long adminId, String reason);
-    
+    boolean rejectProduct(Long productId, Long adminId, String reason, String ipAddress, String userAgent);
+
     /**
      * 下架商品
      * @param productId 商品ID
      * @param adminId 管理员ID
      * @param reason 下架原因
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作是否成功
      */
-    boolean delistProduct(Long productId, Long adminId, String reason);
-    
+    boolean delistProduct(Long productId, Long adminId, String reason, String ipAddress, String userAgent);
+
     /**
      * 删除商品（软删除）
      * @param productId 商品ID
      * @param adminId 管理员ID
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作是否成功
      */
-    boolean deleteProduct(Long productId, Long adminId);
+    boolean deleteProduct(Long productId, Long adminId, String ipAddress, String userAgent);
 }

@@ -1,8 +1,10 @@
 package com.shiwu.user.service.impl;
 
-import com.shiwu.admin.dao.AuditLogDao;
+import com.shiwu.admin.enums.AuditActionEnum;
+import com.shiwu.admin.enums.AuditTargetTypeEnum;
 import com.shiwu.admin.model.AdminUserQueryDTO;
-import com.shiwu.admin.model.AuditLog;
+import com.shiwu.admin.service.AuditLogService;
+import com.shiwu.admin.service.impl.AuditLogServiceImpl;
 import com.shiwu.user.dao.AdminUserDao;
 import com.shiwu.user.dao.UserDao;
 import com.shiwu.user.model.User;
@@ -16,6 +18,7 @@ import java.util.Map;
 
 /**
  * 管理员用户服务实现类
+ * 实现NFR-SEC-03要求，在所有敏感操作中嵌入审计日志记录
  */
 public class AdminUserServiceImpl implements AdminUserService {
     private static final Logger logger = LoggerFactory.getLogger(AdminUserServiceImpl.class);
@@ -27,19 +30,19 @@ public class AdminUserServiceImpl implements AdminUserService {
     
     private final AdminUserDao adminUserDao;
     private final UserDao userDao;
-    private final AuditLogDao auditLogDao;
+    private final AuditLogService auditLogService;
 
     public AdminUserServiceImpl() {
         this.adminUserDao = new AdminUserDao();
         this.userDao = new UserDao();
-        this.auditLogDao = new AuditLogDao();
+        this.auditLogService = new AuditLogServiceImpl();
     }
 
     // 用于测试的构造函数
-    public AdminUserServiceImpl(AdminUserDao adminUserDao, UserDao userDao, AuditLogDao auditLogDao) {
+    public AdminUserServiceImpl(AdminUserDao adminUserDao, UserDao userDao, AuditLogService auditLogService) {
         this.adminUserDao = adminUserDao;
         this.userDao = userDao;
-        this.auditLogDao = auditLogDao;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -52,19 +55,17 @@ public class AdminUserServiceImpl implements AdminUserService {
         try {
             // 查询用户列表
             List<Map<String, Object>> users = adminUserDao.findUsers(queryDTO);
-            
+
             // 查询总数
-            int totalCount = adminUserDao.countUsers(queryDTO);
-            
-            // 计算分页信息
-            int totalPages = (int) Math.ceil((double) totalCount / queryDTO.getPageSize());
-            
+            long totalCount = adminUserDao.countUsers(queryDTO);
+
+            // 构建返回结果
             Map<String, Object> result = new HashMap<>();
             result.put("users", users);
             result.put("totalCount", totalCount);
-            result.put("totalPages", totalPages);
-            result.put("currentPage", queryDTO.getPageNum());
+            result.put("page", queryDTO.getPageNum());
             result.put("pageSize", queryDTO.getPageSize());
+            result.put("totalPages", (totalCount + queryDTO.getPageSize() - 1) / queryDTO.getPageSize());
             
             logger.info("查询用户列表成功: 共{}条记录", totalCount);
             return result;
@@ -91,7 +92,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
 
             Map<String, Object> result = new HashMap<>();
-            result.put("user", convertToAdminUserVO(user));
+            result.put("user", user);
             
             logger.info("管理员 {} 获取用户详情成功: userId={}", adminId, userId);
             return result;
@@ -102,7 +103,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
-    public boolean banUser(Long userId, Long adminId, String reason) {
+    public boolean banUser(Long userId, Long adminId, String reason, String ipAddress, String userAgent) {
         if (userId == null || adminId == null) {
             logger.warn("封禁用户失败: 参数为空");
             return false;
@@ -113,26 +114,33 @@ public class AdminUserServiceImpl implements AdminUserService {
             User user = userDao.findById(userId);
             if (user == null) {
                 logger.warn("封禁用户失败: 用户不存在, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_BAN, AuditTargetTypeEnum.USER, 
+                                         userId, "封禁用户失败: 用户不存在" + (reason != null ? ", 原因: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
             // 检查用户当前状态
             if (USER_STATUS_BANNED.equals(user.getStatus())) {
                 logger.warn("封禁用户失败: 用户已被封禁, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_BAN, AuditTargetTypeEnum.USER, 
+                                         userId, "封禁用户失败: 用户已被封禁" + (reason != null ? ", 原因: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
             // 更新用户状态为封禁
             boolean success = adminUserDao.updateUserStatus(userId, USER_STATUS_BANNED, adminId);
             
+            // 记录审计日志
+            String details = "封禁用户: " + user.getUsername() + " (ID: " + userId + ")" + 
+                           (reason != null ? ", 原因: " + reason : "");
+            auditLogService.logAction(adminId, AuditActionEnum.USER_BAN, AuditTargetTypeEnum.USER, 
+                                     userId, details, ipAddress, userAgent, success);
+            
             if (success) {
-                // 记录审计日志
-                AuditLog auditLog = new AuditLog();
-                auditLog.setAdminId(adminId);
-                auditLog.setAction("USER_BAN");
-                auditLog.setDetails("封禁用户: " + userId + (reason != null ? ", 原因: " + reason : ""));
-                auditLogDao.createAuditLog(auditLog);
-                
                 logger.info("管理员 {} 封禁用户 {} 成功", adminId, userId);
                 return true;
             } else {
@@ -141,12 +149,16 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
         } catch (Exception e) {
             logger.error("封禁用户失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.USER_BAN, AuditTargetTypeEnum.USER, 
+                                     userId, "封禁用户异常: " + e.getMessage() + (reason != null ? ", 原因: " + reason : ""), 
+                                     ipAddress, userAgent, false);
             return false;
         }
     }
 
     @Override
-    public boolean muteUser(Long userId, Long adminId, String reason) {
+    public boolean muteUser(Long userId, Long adminId, String reason, String ipAddress, String userAgent) {
         if (userId == null || adminId == null) {
             logger.warn("禁言用户失败: 参数为空");
             return false;
@@ -157,31 +169,42 @@ public class AdminUserServiceImpl implements AdminUserService {
             User user = userDao.findById(userId);
             if (user == null) {
                 logger.warn("禁言用户失败: 用户不存在, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_MUTE, AuditTargetTypeEnum.USER, 
+                                         userId, "禁言用户失败: 用户不存在" + (reason != null ? ", 原因: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
             // 检查用户当前状态
             if (USER_STATUS_BANNED.equals(user.getStatus())) {
                 logger.warn("禁言用户失败: 用户已被封禁, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_MUTE, AuditTargetTypeEnum.USER, 
+                                         userId, "禁言用户失败: 用户已被封禁" + (reason != null ? ", 原因: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
             if (USER_STATUS_MUTED.equals(user.getStatus())) {
                 logger.warn("禁言用户失败: 用户已被禁言, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_MUTE, AuditTargetTypeEnum.USER, 
+                                         userId, "禁言用户失败: 用户已被禁言" + (reason != null ? ", 原因: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
             // 更新用户状态为禁言
             boolean success = adminUserDao.updateUserStatus(userId, USER_STATUS_MUTED, adminId);
             
+            // 记录审计日志
+            String details = "禁言用户: " + user.getUsername() + " (ID: " + userId + ")" + 
+                           (reason != null ? ", 原因: " + reason : "");
+            auditLogService.logAction(adminId, AuditActionEnum.USER_MUTE, AuditTargetTypeEnum.USER, 
+                                     userId, details, ipAddress, userAgent, success);
+            
             if (success) {
-                // 记录审计日志
-                AuditLog auditLog = new AuditLog();
-                auditLog.setAdminId(adminId);
-                auditLog.setAction("USER_MUTE");
-                auditLog.setDetails("禁言用户: " + userId + (reason != null ? ", 原因: " + reason : ""));
-                auditLogDao.createAuditLog(auditLog);
-                
                 logger.info("管理员 {} 禁言用户 {} 成功", adminId, userId);
                 return true;
             } else {
@@ -190,12 +213,16 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
         } catch (Exception e) {
             logger.error("禁言用户失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.USER_MUTE, AuditTargetTypeEnum.USER, 
+                                     userId, "禁言用户异常: " + e.getMessage() + (reason != null ? ", 原因: " + reason : ""), 
+                                     ipAddress, userAgent, false);
             return false;
         }
     }
 
     @Override
-    public boolean unbanUser(Long userId, Long adminId) {
+    public boolean unbanUser(Long userId, Long adminId, String ipAddress, String userAgent) {
         if (userId == null || adminId == null) {
             logger.warn("解封用户失败: 参数为空");
             return false;
@@ -206,26 +233,30 @@ public class AdminUserServiceImpl implements AdminUserService {
             User user = userDao.findById(userId);
             if (user == null) {
                 logger.warn("解封用户失败: 用户不存在, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_UNBAN, AuditTargetTypeEnum.USER, 
+                                         userId, "解封用户失败: 用户不存在", ipAddress, userAgent, false);
                 return false;
             }
 
             // 检查用户当前状态
             if (!USER_STATUS_BANNED.equals(user.getStatus())) {
-                logger.warn("解封用户失败: 用户未被封禁, userId={}, status={}", userId, user.getStatus());
+                logger.warn("解封用户失败: 用户未被封禁, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_UNBAN, AuditTargetTypeEnum.USER, 
+                                         userId, "解封用户失败: 用户未被封禁", ipAddress, userAgent, false);
                 return false;
             }
 
             // 更新用户状态为正常
             boolean success = adminUserDao.updateUserStatus(userId, USER_STATUS_NORMAL, adminId);
             
+            // 记录审计日志
+            String details = "解封用户: " + user.getUsername() + " (ID: " + userId + ")";
+            auditLogService.logAction(adminId, AuditActionEnum.USER_UNBAN, AuditTargetTypeEnum.USER, 
+                                     userId, details, ipAddress, userAgent, success);
+            
             if (success) {
-                // 记录审计日志
-                AuditLog auditLog = new AuditLog();
-                auditLog.setAdminId(adminId);
-                auditLog.setAction("USER_UNBAN");
-                auditLog.setDetails("解封用户: " + userId);
-                auditLogDao.createAuditLog(auditLog);
-                
                 logger.info("管理员 {} 解封用户 {} 成功", adminId, userId);
                 return true;
             } else {
@@ -234,12 +265,15 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
         } catch (Exception e) {
             logger.error("解封用户失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.USER_UNBAN, AuditTargetTypeEnum.USER, 
+                                     userId, "解封用户异常: " + e.getMessage(), ipAddress, userAgent, false);
             return false;
         }
     }
 
     @Override
-    public boolean unmuteUser(Long userId, Long adminId) {
+    public boolean unmuteUser(Long userId, Long adminId, String ipAddress, String userAgent) {
         if (userId == null || adminId == null) {
             logger.warn("解除禁言失败: 参数为空");
             return false;
@@ -250,26 +284,30 @@ public class AdminUserServiceImpl implements AdminUserService {
             User user = userDao.findById(userId);
             if (user == null) {
                 logger.warn("解除禁言失败: 用户不存在, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_UNMUTE, AuditTargetTypeEnum.USER, 
+                                         userId, "解除禁言失败: 用户不存在", ipAddress, userAgent, false);
                 return false;
             }
 
             // 检查用户当前状态
             if (!USER_STATUS_MUTED.equals(user.getStatus())) {
-                logger.warn("解除禁言失败: 用户未被禁言, userId={}, status={}", userId, user.getStatus());
+                logger.warn("解除禁言失败: 用户未被禁言, userId={}", userId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.USER_UNMUTE, AuditTargetTypeEnum.USER, 
+                                         userId, "解除禁言失败: 用户未被禁言", ipAddress, userAgent, false);
                 return false;
             }
 
             // 更新用户状态为正常
             boolean success = adminUserDao.updateUserStatus(userId, USER_STATUS_NORMAL, adminId);
             
+            // 记录审计日志
+            String details = "解除禁言: " + user.getUsername() + " (ID: " + userId + ")";
+            auditLogService.logAction(adminId, AuditActionEnum.USER_UNMUTE, AuditTargetTypeEnum.USER, 
+                                     userId, details, ipAddress, userAgent, success);
+            
             if (success) {
-                // 记录审计日志
-                AuditLog auditLog = new AuditLog();
-                auditLog.setAdminId(adminId);
-                auditLog.setAction("USER_UNMUTE");
-                auditLog.setDetails("解除禁言: " + userId);
-                auditLogDao.createAuditLog(auditLog);
-                
                 logger.info("管理员 {} 解除用户 {} 禁言成功", adminId, userId);
                 return true;
             } else {
@@ -278,113 +316,108 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
         } catch (Exception e) {
             logger.error("解除禁言失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.USER_UNMUTE, AuditTargetTypeEnum.USER, 
+                                     userId, "解除禁言异常: " + e.getMessage(), ipAddress, userAgent, false);
             return false;
         }
     }
 
     @Override
-    public Map<String, Object> batchBanUsers(List<Long> userIds, Long adminId, String reason) {
+    public Map<String, Object> batchBanUsers(List<Long> userIds, Long adminId, String reason, String ipAddress, String userAgent) {
         if (userIds == null || userIds.isEmpty() || adminId == null) {
             logger.warn("批量封禁用户失败: 参数为空");
             return null;
         }
 
         try {
+            int totalCount = userIds.size();
             int successCount = 0;
             int failCount = 0;
-            
+
             for (Long userId : userIds) {
-                boolean success = banUser(userId, adminId, reason);
-                if (success) {
-                    successCount++;
-                } else {
+                try {
+                    boolean success = banUser(userId, adminId, reason, ipAddress, userAgent);
+                    if (success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (Exception e) {
+                    logger.error("批量封禁用户失败: userId={}, error={}", userId, e.getMessage());
                     failCount++;
                 }
             }
-            
+
+            // 记录批量操作的审计日志
+            String details = String.format("批量封禁用户: 总数=%d, 成功=%d, 失败=%d%s",
+                                          totalCount, successCount, failCount,
+                                          reason != null ? ", 原因: " + reason : "");
+            auditLogService.logAction(adminId, AuditActionEnum.USER_BATCH_BAN, AuditTargetTypeEnum.USER,
+                                     null, details, ipAddress, userAgent, failCount == 0);
+
             Map<String, Object> result = new HashMap<>();
-            result.put("totalCount", userIds.size());
+            result.put("totalCount", totalCount);
             result.put("successCount", successCount);
             result.put("failCount", failCount);
-            
-            logger.info("管理员 {} 批量封禁用户完成: 总数={}, 成功={}, 失败={}", 
-                       adminId, userIds.size(), successCount, failCount);
+
+            logger.info("管理员 {} 批量封禁用户完成: 总数={}, 成功={}, 失败={}", adminId, totalCount, successCount, failCount);
             return result;
         } catch (Exception e) {
             logger.error("批量封禁用户失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.USER_BATCH_BAN, AuditTargetTypeEnum.USER,
+                                     null, "批量封禁用户异常: " + e.getMessage(), ipAddress, userAgent, false);
             return null;
         }
     }
 
     @Override
-    public Map<String, Object> batchMuteUsers(List<Long> userIds, Long adminId, String reason) {
+    public Map<String, Object> batchMuteUsers(List<Long> userIds, Long adminId, String reason, String ipAddress, String userAgent) {
         if (userIds == null || userIds.isEmpty() || adminId == null) {
             logger.warn("批量禁言用户失败: 参数为空");
             return null;
         }
 
         try {
+            int totalCount = userIds.size();
             int successCount = 0;
             int failCount = 0;
-            
+
             for (Long userId : userIds) {
-                boolean success = muteUser(userId, adminId, reason);
-                if (success) {
-                    successCount++;
-                } else {
+                try {
+                    boolean success = muteUser(userId, adminId, reason, ipAddress, userAgent);
+                    if (success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (Exception e) {
+                    logger.error("批量禁言用户失败: userId={}, error={}", userId, e.getMessage());
                     failCount++;
                 }
             }
-            
+
+            // 记录批量操作的审计日志
+            String details = String.format("批量禁言用户: 总数=%d, 成功=%d, 失败=%d%s",
+                                          totalCount, successCount, failCount,
+                                          reason != null ? ", 原因: " + reason : "");
+            auditLogService.logAction(adminId, AuditActionEnum.USER_BATCH_MUTE, AuditTargetTypeEnum.USER,
+                                     null, details, ipAddress, userAgent, failCount == 0);
+
             Map<String, Object> result = new HashMap<>();
-            result.put("totalCount", userIds.size());
+            result.put("totalCount", totalCount);
             result.put("successCount", successCount);
             result.put("failCount", failCount);
-            
-            logger.info("管理员 {} 批量禁言用户完成: 总数={}, 成功={}, 失败={}", 
-                       adminId, userIds.size(), successCount, failCount);
+
+            logger.info("管理员 {} 批量禁言用户完成: 总数={}, 成功={}, 失败={}", adminId, totalCount, successCount, failCount);
             return result;
         } catch (Exception e) {
             logger.error("批量禁言用户失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.USER_BATCH_MUTE, AuditTargetTypeEnum.USER,
+                                     null, "批量禁言用户异常: " + e.getMessage(), ipAddress, userAgent, false);
             return null;
-        }
-    }
-
-    /**
-     * 转换为管理员用户视图对象
-     */
-    private Map<String, Object> convertToAdminUserVO(User user) {
-        Map<String, Object> userVO = new HashMap<>();
-        userVO.put("id", user.getId());
-        userVO.put("username", user.getUsername());
-        userVO.put("email", user.getEmail());
-        userVO.put("phone", user.getPhone());
-        userVO.put("nickname", user.getNickname());
-        userVO.put("status", user.getStatus());
-        userVO.put("statusText", getStatusText(user.getStatus()));
-        userVO.put("avatarUrl", user.getAvatarUrl());
-        userVO.put("gender", user.getGender());
-        userVO.put("bio", user.getBio());
-        userVO.put("followerCount", user.getFollowerCount());
-        userVO.put("averageRating", user.getAverageRating());
-        userVO.put("lastLoginTime", user.getLastLoginTime());
-        userVO.put("createTime", user.getCreateTime());
-        userVO.put("updateTime", user.getUpdateTime());
-        return userVO;
-    }
-
-    /**
-     * 获取状态文本
-     */
-    private String getStatusText(Integer status) {
-        if (status == null) {
-            return "未知";
-        }
-        switch (status) {
-            case 0: return "正常";
-            case 1: return "已封禁";
-            case 2: return "已禁言";
-            default: return "未知";
         }
     }
 }

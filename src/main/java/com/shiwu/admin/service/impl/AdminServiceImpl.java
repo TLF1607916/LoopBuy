@@ -1,9 +1,12 @@
 package com.shiwu.admin.service.impl;
 
 import com.shiwu.admin.dao.AdminDao;
-import com.shiwu.admin.dao.AuditLogDao;
+import com.shiwu.admin.enums.AuditActionEnum;
+import com.shiwu.admin.enums.AuditTargetTypeEnum;
 import com.shiwu.admin.model.*;
 import com.shiwu.admin.service.AdminService;
+import com.shiwu.admin.service.AuditLogService;
+import com.shiwu.admin.service.impl.AuditLogServiceImpl;
 import com.shiwu.common.util.JwtUtil;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
@@ -22,20 +25,20 @@ public class AdminServiceImpl implements AdminService {
     private static final Integer ADMIN_STATUS_DISABLED = 0;
 
     private final AdminDao adminDao;
-    private final AuditLogDao auditLogDao;
+    private final AuditLogService auditLogService;
 
     // 存储待确认的操作上下文（生产环境应使用Redis等缓存）
     private final Map<String, OperationContext> operationContexts = new ConcurrentHashMap<>();
 
     public AdminServiceImpl() {
         this.adminDao = new AdminDao();
-        this.auditLogDao = new AuditLogDao();
+        this.auditLogService = new AuditLogServiceImpl();
     }
 
     // 用于测试的构造函数，支持依赖注入
-    public AdminServiceImpl(AdminDao adminDao, AuditLogDao auditLogDao) {
+    public AdminServiceImpl(AdminDao adminDao, AuditLogService auditLogService) {
         this.adminDao = adminDao;
-        this.auditLogDao = auditLogDao;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -51,10 +54,11 @@ public class AdminServiceImpl implements AdminService {
             Administrator admin = adminDao.findByUsername(username);
             if (admin == null) {
                 logger.warn("管理员登录失败: 管理员不存在, username={}", username);
-                // 记录失败的登录尝试（adminId为null时不记录审计日志）
+                // 记录失败的登录尝试
                 try {
-                    auditLogDao.logAdminLogin(null, ipAddress, userAgent, false,
-                                            "管理员不存在: " + username);
+                    auditLogService.logAction(null, AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                            null, "管理员登录失败: 管理员不存在 - " + username,
+                                            ipAddress, userAgent, false);
                 } catch (Exception e) {
                     logger.warn("记录审计日志失败: {}", e.getMessage());
                 }
@@ -64,15 +68,17 @@ public class AdminServiceImpl implements AdminService {
             // 检查管理员状态
             if (admin.getDeleted() != null && admin.getDeleted()) {
                 logger.warn("管理员登录失败: 管理员已删除, username={}", username);
-                auditLogDao.logAdminLogin(admin.getId(), ipAddress, userAgent, false, 
-                                        "管理员已删除");
+                auditLogService.logAction(admin.getId(), AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                         admin.getId(), "管理员登录失败: 管理员已删除",
+                                         ipAddress, userAgent, false);
                 return AdminLoginResult.fail(AdminLoginErrorEnum.ADMIN_DELETED);
             }
 
             if (!ADMIN_STATUS_NORMAL.equals(admin.getStatus())) {
                 logger.warn("管理员登录失败: 管理员账户被禁用, username={}", username);
-                auditLogDao.logAdminLogin(admin.getId(), ipAddress, userAgent, false, 
-                                        "管理员账户被禁用");
+                auditLogService.logAction(admin.getId(), AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                         admin.getId(), "管理员登录失败: 管理员账户被禁用",
+                                         ipAddress, userAgent, false);
                 return AdminLoginResult.fail(AdminLoginErrorEnum.ADMIN_DISABLED);
             }
 
@@ -80,8 +86,9 @@ public class AdminServiceImpl implements AdminService {
             boolean passwordMatches = BCrypt.checkpw(password, admin.getPassword());
             if (!passwordMatches) {
                 logger.warn("管理员登录失败: 密码错误, username={}", username);
-                auditLogDao.logAdminLogin(admin.getId(), ipAddress, userAgent, false, 
-                                        "密码错误");
+                auditLogService.logAction(admin.getId(), AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                         admin.getId(), "管理员登录失败: 密码错误",
+                                         ipAddress, userAgent, false);
                 return AdminLoginResult.fail(AdminLoginErrorEnum.WRONG_PASSWORD);
             }
 
@@ -95,16 +102,18 @@ public class AdminServiceImpl implements AdminService {
             String token = generateAdminToken(admin.getId(), admin.getUsername(), admin.getRole());
             if (token == null) {
                 logger.error("管理员 {} 登录成功但生成JWT令牌失败", username);
-                auditLogDao.logAdminLogin(admin.getId(), ipAddress, userAgent, false, 
-                                        "生成JWT令牌失败");
+                auditLogService.logAction(admin.getId(), AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                         admin.getId(), "管理员登录失败: 生成JWT令牌失败",
+                                         ipAddress, userAgent, false);
                 return AdminLoginResult.fail(AdminLoginErrorEnum.SYSTEM_ERROR);
             }
 
             adminVO.setToken(token);
             
             // 记录成功的登录
-            auditLogDao.logAdminLogin(admin.getId(), ipAddress, userAgent, true, 
-                                    "管理员登录成功");
+            auditLogService.logAction(admin.getId(), AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                     admin.getId(), "管理员登录成功",
+                                     ipAddress, userAgent, true);
             
             logger.info("管理员 {} 登录成功并生成JWT令牌", username);
             return AdminLoginResult.success(adminVO);
@@ -227,8 +236,9 @@ public class AdminServiceImpl implements AdminService {
             Administrator admin = adminDao.findById(adminId);
             if (admin == null) {
                 logger.warn("二次确认失败: 管理员不存在, adminId={}", adminId);
-                auditLogDao.logAdminLogin(adminId, ipAddress, userAgent, false,
-                                        "二次确认失败: 管理员不存在");
+                auditLogService.logAction(adminId, AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                         adminId, "二次确认失败: 管理员不存在",
+                                         ipAddress, userAgent, false);
                 return SecondaryConfirmationResult.fail(SecondaryConfirmationErrorEnum.ADMIN_NOT_FOUND);
             }
 
@@ -247,8 +257,9 @@ public class AdminServiceImpl implements AdminService {
             boolean passwordMatches = BCrypt.checkpw(password, admin.getPassword());
             if (!passwordMatches) {
                 logger.warn("二次确认失败: 密码错误, adminId={}", adminId);
-                auditLogDao.logAdminLogin(adminId, ipAddress, userAgent, false,
-                                        "二次确认密码错误: " + operationCode);
+                auditLogService.logAction(adminId, AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                         adminId, "二次确认密码错误: " + operationCode,
+                                         ipAddress, userAgent, false);
                 return SecondaryConfirmationResult.fail(SecondaryConfirmationErrorEnum.WRONG_PASSWORD);
             }
 
@@ -262,14 +273,16 @@ public class AdminServiceImpl implements AdminService {
             if (!HighRiskOperation.hasPermissionForOperation(operation, admin.getRole())) {
                 logger.warn("二次确认失败: 权限不足, adminId={}, operationCode={}, role={}",
                           adminId, operationCode, admin.getRole());
-                auditLogDao.logAdminLogin(adminId, ipAddress, userAgent, false,
-                                        "二次确认权限不足: " + operationCode);
+                auditLogService.logAction(adminId, AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                         adminId, "二次确认权限不足: " + operationCode,
+                                         ipAddress, userAgent, false);
                 return SecondaryConfirmationResult.fail(SecondaryConfirmationErrorEnum.INSUFFICIENT_PERMISSION);
             }
 
             // 记录成功的二次确认
-            auditLogDao.logAdminLogin(adminId, ipAddress, userAgent, true,
-                                    "二次确认成功: " + operationCode);
+            auditLogService.logAction(adminId, AuditActionEnum.ADMIN_LOGIN, AuditTargetTypeEnum.ADMIN,
+                                     adminId, "二次确认成功: " + operationCode,
+                                     ipAddress, userAgent, true);
 
             logger.info("管理员 {} 二次确认成功, 操作: {}", admin.getUsername(), operationCode);
             return SecondaryConfirmationResult.success("二次确认成功", operation.getDescription());

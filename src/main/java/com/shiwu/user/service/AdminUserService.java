@@ -30,50 +30,62 @@ public interface AdminUserService {
      * @param userId 用户ID
      * @param adminId 管理员ID
      * @param reason 封禁原因
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作是否成功
      */
-    boolean banUser(Long userId, Long adminId, String reason);
-    
+    boolean banUser(Long userId, Long adminId, String reason, String ipAddress, String userAgent);
+
     /**
      * 禁言用户
      * @param userId 用户ID
      * @param adminId 管理员ID
      * @param reason 禁言原因
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作是否成功
      */
-    boolean muteUser(Long userId, Long adminId, String reason);
-    
+    boolean muteUser(Long userId, Long adminId, String reason, String ipAddress, String userAgent);
+
     /**
      * 解封用户
      * @param userId 用户ID
      * @param adminId 管理员ID
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作是否成功
      */
-    boolean unbanUser(Long userId, Long adminId);
-    
+    boolean unbanUser(Long userId, Long adminId, String ipAddress, String userAgent);
+
     /**
      * 解除禁言
      * @param userId 用户ID
      * @param adminId 管理员ID
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作是否成功
      */
-    boolean unmuteUser(Long userId, Long adminId);
+    boolean unmuteUser(Long userId, Long adminId, String ipAddress, String userAgent);
     
     /**
      * 批量封禁用户
      * @param userIds 用户ID列表
      * @param adminId 管理员ID
      * @param reason 封禁原因
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作结果统计
      */
-    Map<String, Object> batchBanUsers(List<Long> userIds, Long adminId, String reason);
-    
+    Map<String, Object> batchBanUsers(List<Long> userIds, Long adminId, String reason, String ipAddress, String userAgent);
+
     /**
      * 批量禁言用户
      * @param userIds 用户ID列表
      * @param adminId 管理员ID
      * @param reason 禁言原因
+     * @param ipAddress IP地址
+     * @param userAgent 用户代理
      * @return 操作结果统计
      */
-    Map<String, Object> batchMuteUsers(List<Long> userIds, Long adminId, String reason);
+    Map<String, Object> batchMuteUsers(List<Long> userIds, Long adminId, String reason, String ipAddress, String userAgent);
 }
