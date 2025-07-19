@@ -356,14 +356,14 @@ public class ProductDao {
         String sql = "UPDATE product SET status = ? WHERE id = ? AND seller_id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
-        
+
         try {
             conn = DBUtil.getConnection();
             pstmt = conn.prepareStatement(sql);
             pstmt.setInt(1, status);
             pstmt.setLong(2, productId);
             pstmt.setLong(3, sellerId);
-            
+
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;
         } catch (SQLException e) {
@@ -372,6 +372,37 @@ public class ProductDao {
         } finally {
             closeResources(conn, pstmt, null);
         }
+    }
+
+    /**
+     * 系统级别更新商品状态（不需要权限验证，用于订单系统等）
+     * @param productId 商品ID
+     * @param status 新状态
+     * @return 更新是否成功
+     */
+    public boolean updateProductStatusBySystem(Long productId, Integer status) {
+        String sql = "UPDATE product SET status = ?, update_time = NOW() WHERE id = ? AND is_deleted = 0";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, status);
+            pstmt.setLong(2, productId);
+
+            int affectedRows = pstmt.executeUpdate();
+            if (affectedRows > 0) {
+                logger.info("系统更新商品状态成功: productId={}, status={}", productId, status);
+                return true;
+            }
+        } catch (SQLException e) {
+            logger.error("系统更新商品状态失败: productId={}, status={}, error={}", productId, status, e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, null);
+        }
+
+        return false;
     }
     
     /**
