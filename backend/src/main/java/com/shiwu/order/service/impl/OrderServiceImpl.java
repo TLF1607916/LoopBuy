@@ -1,0 +1,589 @@
+package com.shiwu.order.service.impl;
+
+import com.shiwu.cart.dao.CartDao;
+import com.shiwu.common.util.JsonUtil;
+import com.shiwu.order.dao.OrderDao;
+import com.shiwu.order.model.*;
+import com.shiwu.order.service.OrderService;
+import com.shiwu.product.dao.ProductDao;
+import com.shiwu.product.model.Product;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 订单服务实现类
+ */
+public class OrderServiceImpl implements OrderService {
+    private static final Logger logger = LoggerFactory.getLogger(OrderServiceImpl.class);
+    
+    private final OrderDao orderDao;
+    private final ProductDao productDao;
+    private final CartDao cartDao;
+    
+    public OrderServiceImpl() {
+        this.orderDao = new OrderDao();
+        this.productDao = new ProductDao();
+        this.cartDao = new CartDao();
+    }
+    
+    @Override
+    public OrderOperationResult createOrder(OrderCreateDTO dto, Long buyerId) {
+        // 参数验证
+        if (dto == null || buyerId == null) {
+            logger.warn("创建订单失败: 请求参数不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+        
+        if (dto.getProductIds() == null || dto.getProductIds().isEmpty()) {
+            logger.warn("创建订单失败: 商品列表不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.EMPTY_PRODUCT_LIST, OrderErrorCode.MSG_EMPTY_PRODUCT_LIST);
+        }
+        
+        List<Long> createdOrderIds = new ArrayList<>();
+        List<Long> lockedProductIds = new ArrayList<>();
+        
+        try {
+            // 遍历每个商品，为每个商品创建单独的订单
+            for (Long productId : dto.getProductIds()) {
+                // 1. 实时验证商品状态
+                Product product = productDao.findById(productId);
+                if (product == null) {
+                    logger.warn("创建订单失败: 商品不存在, productId={}", productId);
+                    rollbackOrders(createdOrderIds, lockedProductIds);
+                    return OrderOperationResult.failure(OrderErrorCode.PRODUCT_NOT_FOUND, OrderErrorCode.MSG_PRODUCT_NOT_FOUND);
+                }
+                
+                // 检查商品状态是否为在售
+                if (!product.getStatus().equals(Product.STATUS_ONSALE)) {
+                    logger.warn("创建订单失败: 商品当前不可购买, productId={}, status={}", productId, product.getStatus());
+                    rollbackOrders(createdOrderIds, lockedProductIds);
+                    return OrderOperationResult.failure(OrderErrorCode.PRODUCT_NOT_AVAILABLE, OrderErrorCode.MSG_PRODUCT_NOT_AVAILABLE);
+                }
+                
+                // 检查是否购买自己的商品
+                if (product.getSellerId().equals(buyerId)) {
+                    logger.warn("创建订单失败: 不能购买自己的商品, productId={}, buyerId={}", productId, buyerId);
+                    rollbackOrders(createdOrderIds, lockedProductIds);
+                    return OrderOperationResult.failure(OrderErrorCode.CANT_BUY_OWN_PRODUCT, OrderErrorCode.MSG_CANT_BUY_OWN_PRODUCT);
+                }
+                
+                // 2. 锁定商品（将商品状态设置为LOCKED）
+                boolean lockSuccess = productDao.updateProductStatusBySystem(productId, Product.STATUS_LOCKED);
+                if (!lockSuccess) {
+                    logger.error("创建订单失败: 锁定商品失败, productId={}", productId);
+                    rollbackOrders(createdOrderIds, lockedProductIds);
+                    return OrderOperationResult.failure(OrderErrorCode.UPDATE_PRODUCT_STATUS_FAILED, OrderErrorCode.MSG_UPDATE_PRODUCT_STATUS_FAILED);
+                }
+                lockedProductIds.add(productId);
+                
+                // 3. 固化商品快照信息
+                String imageUrlsSnapshot = getProductImageUrlsSnapshot(productId);
+                
+                // 4. 创建订单
+                Order order = new Order(
+                    buyerId,
+                    product.getSellerId(),
+                    productId,
+                    product.getPrice(),
+                    product.getTitle(),
+                    product.getDescription(),
+                    imageUrlsSnapshot
+                );
+                
+                Long orderId = orderDao.createOrder(order);
+                if (orderId == null) {
+                    logger.error("创建订单失败: 数据库操作失败, productId={}", productId);
+                    rollbackOrders(createdOrderIds, lockedProductIds);
+                    return OrderOperationResult.failure(OrderErrorCode.CREATE_ORDER_FAILED, OrderErrorCode.MSG_CREATE_ORDER_FAILED);
+                }
+                
+                createdOrderIds.add(orderId);
+                
+                // 5. 从购物车中移除该商品
+                cartDao.removeFromCart(buyerId, productId);
+                
+                logger.info("创建订单成功: orderId={}, buyerId={}, sellerId={}, productId={}", 
+                           orderId, buyerId, product.getSellerId(), productId);
+            }
+            
+            // 返回成功结果
+            Map<String, Object> data = new HashMap<>();
+            data.put("orderIds", createdOrderIds);
+            data.put("orderCount", createdOrderIds.size());
+            
+            logger.info("批量创建订单成功: buyerId={}, orderCount={}, orderIds={}", 
+                       buyerId, createdOrderIds.size(), createdOrderIds);
+            
+            return OrderOperationResult.success(data);
+            
+        } catch (Exception e) {
+            logger.error("创建订单时发生异常: buyerId={}, error={}", buyerId, e.getMessage(), e);
+            rollbackOrders(createdOrderIds, lockedProductIds);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+    
+    @Override
+    public OrderOperationResult getBuyerOrders(Long buyerId) {
+        if (buyerId == null) {
+            logger.warn("获取买家订单列表失败: 买家ID不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+        
+        try {
+            List<OrderVO> orders = orderDao.findOrdersByBuyerId(buyerId);
+            
+            // 设置订单状态描述
+            for (OrderVO order : orders) {
+                order.setStatusText(getOrderStatusText(order.getStatus()));
+                
+                // 解析图片URL快照
+                if (order.getProductImageUrlsSnapshot() != null && !order.getProductImageUrlsSnapshot().isEmpty()) {
+                    // 如果productImageUrlsSnapshot已经是List类型，说明已经在DAO层解析过了
+                    // 这里不需要再次解析
+                } else {
+                    order.setProductImageUrlsSnapshot(new ArrayList<>());
+                }
+            }
+            
+            Map<String, Object> data = new HashMap<>();
+            data.put("orders", orders);
+            data.put("total", orders.size());
+            
+            logger.info("获取买家订单列表成功: buyerId={}, orderCount={}", buyerId, orders.size());
+            return OrderOperationResult.success(data);
+            
+        } catch (Exception e) {
+            logger.error("获取买家订单列表失败: buyerId={}, error={}", buyerId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+    
+    @Override
+    public OrderOperationResult getSellerOrders(Long sellerId) {
+        if (sellerId == null) {
+            logger.warn("获取卖家订单列表失败: 卖家ID不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+        
+        try {
+            List<OrderVO> orders = orderDao.findOrdersBySellerId(sellerId);
+            
+            // 设置订单状态描述
+            for (OrderVO order : orders) {
+                order.setStatusText(getOrderStatusText(order.getStatus()));
+                
+                // 解析图片URL快照
+                if (order.getProductImageUrlsSnapshot() != null && !order.getProductImageUrlsSnapshot().isEmpty()) {
+                    // 如果productImageUrlsSnapshot已经是List类型，说明已经在DAO层解析过了
+                    // 这里不需要再次解析
+                } else {
+                    order.setProductImageUrlsSnapshot(new ArrayList<>());
+                }
+            }
+            
+            Map<String, Object> data = new HashMap<>();
+            data.put("orders", orders);
+            data.put("total", orders.size());
+            
+            logger.info("获取卖家订单列表成功: sellerId={}, orderCount={}", sellerId, orders.size());
+            return OrderOperationResult.success(data);
+            
+        } catch (Exception e) {
+            logger.error("获取卖家订单列表失败: sellerId={}, error={}", sellerId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+    
+    @Override
+    public OrderOperationResult getOrderById(Long orderId, Long userId) {
+        if (orderId == null || userId == null) {
+            logger.warn("获取订单详情失败: 参数不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+        
+        try {
+            Order order = orderDao.findById(orderId);
+            if (order == null) {
+                logger.warn("获取订单详情失败: 订单不存在, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_NOT_FOUND, OrderErrorCode.MSG_ORDER_NOT_FOUND);
+            }
+            
+            // 权限验证：只有买家或卖家才能查看订单
+            if (!order.getBuyerId().equals(userId) && !order.getSellerId().equals(userId)) {
+                logger.warn("获取订单详情失败: 无权查看订单, orderId={}, userId={}", orderId, userId);
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_NOT_FOUND, OrderErrorCode.MSG_ORDER_NOT_FOUND);
+            }
+            
+            logger.info("获取订单详情成功: orderId={}, userId={}", orderId, userId);
+            return OrderOperationResult.success(order);
+            
+        } catch (Exception e) {
+            logger.error("获取订单详情失败: orderId={}, userId={}, error={}", orderId, userId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+    
+    @Override
+    public OrderOperationResult updateOrderStatus(Long orderId, Integer status, Long userId) {
+        if (orderId == null || status == null || userId == null) {
+            logger.warn("更新订单状态失败: 参数不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+        
+        try {
+            Order order = orderDao.findById(orderId);
+            if (order == null) {
+                logger.warn("更新订单状态失败: 订单不存在, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_NOT_FOUND, OrderErrorCode.MSG_ORDER_NOT_FOUND);
+            }
+            
+            // 权限验证：只有买家或卖家才能更新订单状态
+            if (!order.getBuyerId().equals(userId) && !order.getSellerId().equals(userId)) {
+                logger.warn("更新订单状态失败: 无权操作订单, orderId={}, userId={}", orderId, userId);
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_NOT_FOUND, OrderErrorCode.MSG_ORDER_NOT_FOUND);
+            }
+            
+            boolean success = orderDao.updateOrderStatus(orderId, status);
+            if (!success) {
+                logger.error("更新订单状态失败: 数据库操作失败, orderId={}, status={}", orderId, status);
+                return OrderOperationResult.failure(OrderErrorCode.UPDATE_ORDER_STATUS_FAILED, OrderErrorCode.MSG_UPDATE_ORDER_STATUS_FAILED);
+            }
+            
+            logger.info("更新订单状态成功: orderId={}, status={}, userId={}", orderId, status, userId);
+            return OrderOperationResult.success(null);
+            
+        } catch (Exception e) {
+            logger.error("更新订单状态失败: orderId={}, status={}, userId={}, error={}", orderId, status, userId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+    
+    /**
+     * 获取商品图片URL快照（JSON格式）
+     */
+    private String getProductImageUrlsSnapshot(Long productId) {
+        try {
+            List<String> imageUrls = new ArrayList<>();
+
+            // 查询商品的所有图片
+            List<com.shiwu.product.model.ProductImage> productImages = productDao.findImagesByProductId(productId);
+            for (com.shiwu.product.model.ProductImage image : productImages) {
+                imageUrls.add(image.getImageUrl());
+            }
+
+            // 转换为JSON格式
+            return JsonUtil.toJson(imageUrls);
+        } catch (Exception e) {
+            logger.warn("获取商品图片快照失败: productId={}, error={}", productId, e.getMessage());
+            return "[]";
+        }
+    }
+    
+    /**
+     * 获取订单状态描述
+     */
+    private String getOrderStatusText(Integer status) {
+        if (status == null) {
+            return "未知状态";
+        }
+        
+        switch (status) {
+            case 0: return "待付款";
+            case 1: return "待发货";
+            case 2: return "已发货";
+            case 3: return "已完成";
+            case 4: return "已取消";
+            case 5: return "申请退货";
+            case 6: return "已退货";
+            default: return "未知状态";
+        }
+    }
+    
+    /**
+     * 回滚已创建的订单和已锁定的商品
+     */
+    private void rollbackOrders(List<Long> createdOrderIds, List<Long> lockedProductIds) {
+        // 回滚已锁定的商品状态
+        for (Long productId : lockedProductIds) {
+            try {
+                productDao.updateProductStatusBySystem(productId, Product.STATUS_ONSALE);
+                logger.info("回滚商品状态成功: productId={}", productId);
+            } catch (Exception e) {
+                logger.error("回滚商品状态失败: productId={}, error={}", productId, e.getMessage(), e);
+            }
+        }
+        
+        // 注意：这里没有删除已创建的订单，因为在实际业务中，
+        // 订单一旦创建就不应该被删除，而是应该标记为取消状态
+        // 如果需要删除订单，可以在这里添加相应的逻辑
+    }
+
+    @Override
+    public OrderOperationResult updateOrderStatusAfterPayment(List<Long> orderIds, String paymentId) {
+        // 参数验证
+        if (orderIds == null || orderIds.isEmpty()) {
+            logger.warn("支付成功后更新订单状态失败: 订单ID列表不能为空, paymentId={}", paymentId);
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+
+        if (paymentId == null || paymentId.trim().isEmpty()) {
+            logger.warn("支付成功后更新订单状态失败: 支付ID不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+
+        try {
+            int successCount = 0;
+            int failureCount = 0;
+
+            for (Long orderId : orderIds) {
+                // 验证订单状态
+                Order order = orderDao.findById(orderId);
+                if (order == null) {
+                    logger.warn("订单不存在: orderId={}, paymentId={}", orderId, paymentId);
+                    failureCount++;
+                    continue;
+                }
+
+                if (!order.getStatus().equals(Order.STATUS_AWAITING_PAYMENT)) {
+                    logger.warn("订单状态不正确: orderId={}, currentStatus={}, paymentId={}",
+                               orderId, order.getStatus(), paymentId);
+                    failureCount++;
+                    continue;
+                }
+
+                // 更新订单状态为待发货
+                boolean updateSuccess = orderDao.updateOrderStatus(orderId, Order.STATUS_AWAITING_SHIPPING);
+                if (updateSuccess) {
+                    successCount++;
+                    logger.info("支付成功后更新订单状态成功: orderId={}, status=AWAITING_SHIPPING, paymentId={}",
+                               orderId, paymentId);
+                } else {
+                    failureCount++;
+                    logger.error("支付成功后更新订单状态失败: orderId={}, paymentId={}", orderId, paymentId);
+                }
+            }
+
+            // 构造返回数据
+            Map<String, Object> data = new HashMap<>();
+            data.put("totalOrders", orderIds.size());
+            data.put("successCount", successCount);
+            data.put("failureCount", failureCount);
+            data.put("paymentId", paymentId);
+
+            if (failureCount > 0) {
+                logger.warn("支付成功后批量更新订单状态部分失败: paymentId={}, success={}, failure={}",
+                           paymentId, successCount, failureCount);
+                return OrderOperationResult.failure(OrderErrorCode.UPDATE_ORDER_STATUS_FAILED,
+                                                   "部分订单状态更新失败");
+            } else {
+                logger.info("支付成功后批量更新订单状态全部成功: paymentId={}, orderCount={}", paymentId, successCount);
+                return OrderOperationResult.success(data);
+            }
+
+        } catch (Exception e) {
+            logger.error("支付成功后更新订单状态时发生异常: paymentId={}, error={}", paymentId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public OrderOperationResult cancelOrdersAfterPaymentFailure(List<Long> orderIds, String reason) {
+        // 参数验证
+        if (orderIds == null || orderIds.isEmpty()) {
+            logger.warn("支付失败后取消订单失败: 订单ID列表不能为空, reason={}", reason);
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+
+        if (reason == null || reason.trim().isEmpty()) {
+            reason = "支付失败";
+        }
+
+        try {
+            int successCount = 0;
+            int failureCount = 0;
+
+            for (Long orderId : orderIds) {
+                // 验证订单状态
+                Order order = orderDao.findById(orderId);
+                if (order == null) {
+                    logger.warn("订单不存在: orderId={}, reason={}", orderId, reason);
+                    failureCount++;
+                    continue;
+                }
+
+                if (!order.getStatus().equals(Order.STATUS_AWAITING_PAYMENT)) {
+                    logger.warn("订单状态不正确: orderId={}, currentStatus={}, reason={}",
+                               orderId, order.getStatus(), reason);
+                    failureCount++;
+                    continue;
+                }
+
+                // 取消订单
+                boolean orderUpdateSuccess = orderDao.updateOrderStatus(orderId, Order.STATUS_CANCELLED);
+                if (orderUpdateSuccess) {
+                    // 解锁商品
+                    boolean productUnlockSuccess = productDao.updateProductStatusBySystem(order.getProductId(), Product.STATUS_ONSALE);
+                    if (productUnlockSuccess) {
+                        successCount++;
+                        logger.info("支付失败后取消订单并解锁商品成功: orderId={}, productId={}, reason={}",
+                                   orderId, order.getProductId(), reason);
+                    } else {
+                        logger.error("解锁商品失败: orderId={}, productId={}, reason={}",
+                                    orderId, order.getProductId(), reason);
+                        // 即使解锁商品失败，订单取消仍然算成功
+                        successCount++;
+                    }
+                } else {
+                    failureCount++;
+                    logger.error("支付失败后取消订单失败: orderId={}, reason={}", orderId, reason);
+                }
+            }
+
+            // 构造返回数据
+            Map<String, Object> data = new HashMap<>();
+            data.put("totalOrders", orderIds.size());
+            data.put("successCount", successCount);
+            data.put("failureCount", failureCount);
+            data.put("reason", reason);
+
+            if (failureCount > 0) {
+                logger.warn("支付失败后批量取消订单部分失败: reason={}, success={}, failure={}",
+                           reason, successCount, failureCount);
+                return OrderOperationResult.failure(OrderErrorCode.UPDATE_ORDER_STATUS_FAILED,
+                                                   "部分订单取消失败");
+            } else {
+                logger.info("支付失败后批量取消订单全部成功: reason={}, orderCount={}", reason, successCount);
+                return OrderOperationResult.success(data);
+            }
+
+        } catch (Exception e) {
+            logger.error("支付失败后取消订单时发生异常: reason={}, error={}", reason, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public OrderOperationResult shipOrder(Long orderId, Long sellerId) {
+        // 参数验证
+        if (orderId == null || sellerId == null) {
+            logger.warn("发货失败: 请求参数不能为空, orderId={}, sellerId={}", orderId, sellerId);
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+
+        try {
+            // 查询订单
+            Order order = orderDao.findById(orderId);
+            if (order == null) {
+                logger.warn("发货失败: 订单不存在, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_NOT_FOUND, OrderErrorCode.MSG_ORDER_NOT_FOUND);
+            }
+
+            // 验证卖家权限
+            if (!order.getSellerId().equals(sellerId)) {
+                logger.warn("发货失败: 无权限发货此订单, orderId={}, sellerId={}, actualSellerId={}",
+                           orderId, sellerId, order.getSellerId());
+                return OrderOperationResult.failure(OrderErrorCode.SHIP_PERMISSION_DENIED, OrderErrorCode.MSG_SHIP_PERMISSION_DENIED);
+            }
+
+            // 验证订单状态
+            if (!order.getStatus().equals(Order.STATUS_AWAITING_SHIPPING)) {
+                logger.warn("发货失败: 订单状态不正确, orderId={}, currentStatus={}", orderId, order.getStatus());
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_STATUS_NOT_AWAITING_SHIPPING, OrderErrorCode.MSG_ORDER_STATUS_NOT_AWAITING_SHIPPING);
+            }
+
+            // 更新订单状态为已发货
+            boolean updateSuccess = orderDao.updateOrderStatus(orderId, Order.STATUS_SHIPPED);
+            if (!updateSuccess) {
+                logger.error("发货失败: 更新订单状态失败, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.SHIP_ORDER_FAILED, OrderErrorCode.MSG_SHIP_ORDER_FAILED);
+            }
+
+            // 构造返回数据 - 简化版本，只返回关键信息
+            Map<String, Object> result = new HashMap<>();
+            result.put("orderId", order.getId());
+            result.put("productId", order.getProductId());
+            result.put("priceAtPurchase", order.getPriceAtPurchase());
+            result.put("status", Order.STATUS_SHIPPED);
+            result.put("statusText", getOrderStatusText(Order.STATUS_SHIPPED));
+            result.put("message", "发货成功");
+
+            logger.info("发货成功: orderId={}, sellerId={}", orderId, sellerId);
+            return OrderOperationResult.success(result);
+
+        } catch (Exception e) {
+            logger.error("发货时发生异常: orderId={}, sellerId={}, error={}", orderId, sellerId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public OrderOperationResult confirmReceipt(Long orderId, Long buyerId) {
+        // 参数验证
+        if (orderId == null || buyerId == null) {
+            logger.warn("确认收货失败: 请求参数不能为空, orderId={}, buyerId={}", orderId, buyerId);
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+
+        try {
+            // 查询订单
+            Order order = orderDao.findById(orderId);
+            if (order == null) {
+                logger.warn("确认收货失败: 订单不存在, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_NOT_FOUND, OrderErrorCode.MSG_ORDER_NOT_FOUND);
+            }
+
+            // 验证买家权限
+            if (!order.getBuyerId().equals(buyerId)) {
+                logger.warn("确认收货失败: 无权限确认收货此订单, orderId={}, buyerId={}, actualBuyerId={}",
+                           orderId, buyerId, order.getBuyerId());
+                return OrderOperationResult.failure(OrderErrorCode.CONFIRM_RECEIPT_PERMISSION_DENIED, OrderErrorCode.MSG_CONFIRM_RECEIPT_PERMISSION_DENIED);
+            }
+
+            // 验证订单状态
+            if (!order.getStatus().equals(Order.STATUS_SHIPPED)) {
+                logger.warn("确认收货失败: 订单状态不正确, orderId={}, currentStatus={}", orderId, order.getStatus());
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_STATUS_NOT_SHIPPED, OrderErrorCode.MSG_ORDER_STATUS_NOT_SHIPPED);
+            }
+
+            // 更新订单状态为已完成
+            boolean orderUpdateSuccess = orderDao.updateOrderStatus(orderId, Order.STATUS_COMPLETED);
+            if (!orderUpdateSuccess) {
+                logger.error("确认收货失败: 更新订单状态失败, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.CONFIRM_RECEIPT_FAILED, OrderErrorCode.MSG_CONFIRM_RECEIPT_FAILED);
+            }
+
+            // 更新商品状态为已售出
+            boolean productUpdateSuccess = productDao.updateProductStatusBySystem(order.getProductId(), Product.STATUS_SOLD);
+            if (!productUpdateSuccess) {
+                logger.error("确认收货失败: 更新商品状态为已售失败, orderId={}, productId={}", orderId, order.getProductId());
+                // 这里可以考虑回滚订单状态，但为了简化，我们只记录错误
+                // 在实际生产环境中，应该使用事务来保证数据一致性
+                return OrderOperationResult.failure(OrderErrorCode.UPDATE_PRODUCT_TO_SOLD_FAILED, OrderErrorCode.MSG_UPDATE_PRODUCT_TO_SOLD_FAILED);
+            }
+
+            // 构造返回数据
+            Map<String, Object> result = new HashMap<>();
+            result.put("orderId", order.getId());
+            result.put("productId", order.getProductId());
+            result.put("priceAtPurchase", order.getPriceAtPurchase());
+            result.put("orderStatus", Order.STATUS_COMPLETED);
+            result.put("orderStatusText", getOrderStatusText(Order.STATUS_COMPLETED));
+            result.put("productStatus", Product.STATUS_SOLD);
+            result.put("productStatusText", "已售出");
+            result.put("message", "确认收货成功");
+
+            logger.info("确认收货成功: orderId={}, buyerId={}, productId={}", orderId, buyerId, order.getProductId());
+            return OrderOperationResult.success(result);
+
+        } catch (Exception e) {
+            logger.error("确认收货时发生异常: orderId={}, buyerId={}, error={}", orderId, buyerId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+}
