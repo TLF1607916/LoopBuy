@@ -1,5 +1,6 @@
 package com.shiwu.admin.dao;
 
+import com.shiwu.admin.dto.AuditLogQueryDTO;
 import com.shiwu.admin.model.AuditLog;
 import com.shiwu.common.util.DBUtil;
 import org.slf4j.Logger;
@@ -212,6 +213,61 @@ public class AuditLogDao {
     }
 
     /**
+     * 获取操作统计数据
+     * @param days 统计天数
+     * @return 统计数据
+     */
+    public Map<String, Object> getOperationStats(int days) {
+        String sql = "SELECT " +
+                    "COUNT(*) as totalOperations, " +
+                    "SUM(CASE WHEN result = 1 THEN 1 ELSE 0 END) as successOperations, " +
+                    "SUM(CASE WHEN result = 0 THEN 1 ELSE 0 END) as failedOperations, " +
+                    "COUNT(DISTINCT admin_id) as activeAdmins, " +
+                    "COUNT(DISTINCT action) as actionTypes " +
+                    "FROM audit_log " +
+                    "WHERE create_time >= DATE_SUB(NOW(), INTERVAL ? DAY)";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Map<String, Object> stats = new HashMap<>();
+
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) {
+                logger.error("获取数据库连接失败");
+                return stats;
+            }
+
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, days);
+
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                stats.put("totalOperations", rs.getInt("totalOperations"));
+                stats.put("successOperations", rs.getInt("successOperations"));
+                stats.put("failedOperations", rs.getInt("failedOperations"));
+                stats.put("activeAdmins", rs.getInt("activeAdmins"));
+                stats.put("actionTypes", rs.getInt("actionTypes"));
+
+                // 计算成功率
+                int total = rs.getInt("totalOperations");
+                int success = rs.getInt("successOperations");
+                double successRate = total > 0 ? (double) success / total * 100 : 0.0;
+                stats.put("successRate", Math.round(successRate * 100.0) / 100.0);
+            }
+
+            logger.info("获取操作统计数据成功: {}天内共{}次操作", days, stats.get("totalOperations"));
+        } catch (SQLException e) {
+            logger.error("获取操作统计数据时发生数据库异常: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return stats;
+    }
+
+    /**
      * 获取活动趋势数据（按天统计）
      * @param days 统计天数
      * @return 趋势数据列表，每个元素包含日期和当天活动数量
@@ -247,6 +303,253 @@ public class AuditLogDao {
         }
 
         return trendData;
+    }
+
+    /**
+     * 分页查询审计日志
+     * @param queryDTO 查询条件
+     * @return 审计日志列表
+     */
+    public List<AuditLog> findAuditLogs(AuditLogQueryDTO queryDTO) {
+        if (queryDTO == null) {
+            logger.warn("查询审计日志失败: 查询条件为空");
+            return new ArrayList<>();
+        }
+
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT id, admin_id, action, target_type, target_id, details, ");
+        sql.append("ip_address, user_agent, result, create_time ");
+        sql.append("FROM audit_log WHERE 1=1 ");
+
+        List<Object> params = new ArrayList<>();
+
+        // 构建查询条件
+        buildQueryConditions(sql, params, queryDTO);
+
+        // 添加排序
+        sql.append("ORDER BY ").append(queryDTO.getSortBy()).append(" ").append(queryDTO.getSortOrder()).append(" ");
+
+        // 添加分页
+        sql.append("LIMIT ? OFFSET ?");
+        params.add(queryDTO.getPageSize());
+        params.add(queryDTO.getOffset());
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        List<AuditLog> auditLogs = new ArrayList<>();
+
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) {
+                logger.error("获取数据库连接失败");
+                return auditLogs;
+            }
+
+            pstmt = conn.prepareStatement(sql.toString());
+
+            // 设置参数
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                AuditLog auditLog = mapResultSetToAuditLog(rs);
+                auditLogs.add(auditLog);
+            }
+
+            logger.info("查询审计日志成功: 共{}条记录", auditLogs.size());
+            return auditLogs;
+        } catch (SQLException e) {
+            logger.error("查询审计日志时发生数据库异常: {}", e.getMessage(), e);
+            return auditLogs;
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+    }
+
+    /**
+     * 统计审计日志总数
+     * @param queryDTO 查询条件
+     * @return 总数
+     */
+    public long countAuditLogs(AuditLogQueryDTO queryDTO) {
+        if (queryDTO == null) {
+            logger.warn("统计审计日志失败: 查询条件为空");
+            return 0;
+        }
+
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT COUNT(*) FROM audit_log WHERE 1=1 ");
+
+        List<Object> params = new ArrayList<>();
+
+        // 构建查询条件（不包括分页和排序）
+        buildQueryConditions(sql, params, queryDTO);
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) {
+                logger.error("获取数据库连接失败");
+                return 0;
+            }
+
+            pstmt = conn.prepareStatement(sql.toString());
+
+            // 设置参数
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                long count = rs.getLong(1);
+                logger.info("统计审计日志成功: 共{}条记录", count);
+                return count;
+            }
+
+            return 0;
+        } catch (SQLException e) {
+            logger.error("统计审计日志时发生数据库异常: {}", e.getMessage(), e);
+            return 0;
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+    }
+
+    /**
+     * 构建查询条件
+     * @param sql SQL构建器
+     * @param params 参数列表
+     * @param queryDTO 查询条件
+     */
+    private void buildQueryConditions(StringBuilder sql, List<Object> params, AuditLogQueryDTO queryDTO) {
+        if (queryDTO.getAdminId() != null) {
+            sql.append("AND admin_id = ? ");
+            params.add(queryDTO.getAdminId());
+        }
+
+        if (queryDTO.getAction() != null && !queryDTO.getAction().trim().isEmpty()) {
+            sql.append("AND action = ? ");
+            params.add(queryDTO.getAction().trim());
+        }
+
+        if (queryDTO.getTargetType() != null && !queryDTO.getTargetType().trim().isEmpty()) {
+            sql.append("AND target_type = ? ");
+            params.add(queryDTO.getTargetType().trim());
+        }
+
+        if (queryDTO.getTargetId() != null) {
+            sql.append("AND target_id = ? ");
+            params.add(queryDTO.getTargetId());
+        }
+
+        if (queryDTO.getIpAddress() != null && !queryDTO.getIpAddress().trim().isEmpty()) {
+            sql.append("AND ip_address = ? ");
+            params.add(queryDTO.getIpAddress().trim());
+        }
+
+        if (queryDTO.getResult() != null) {
+            sql.append("AND result = ? ");
+            params.add(queryDTO.getResult());
+        }
+
+        if (queryDTO.getStartTime() != null) {
+            sql.append("AND create_time >= ? ");
+            params.add(Timestamp.valueOf(queryDTO.getStartTime()));
+        }
+
+        if (queryDTO.getEndTime() != null) {
+            sql.append("AND create_time <= ? ");
+            params.add(Timestamp.valueOf(queryDTO.getEndTime()));
+        }
+
+        if (queryDTO.getKeyword() != null && !queryDTO.getKeyword().trim().isEmpty()) {
+            sql.append("AND details LIKE ? ");
+            params.add("%" + queryDTO.getKeyword().trim() + "%");
+        }
+    }
+
+    /**
+     * 将ResultSet映射为AuditLog对象
+     * @param rs ResultSet
+     * @return AuditLog对象
+     * @throws SQLException SQL异常
+     */
+    private AuditLog mapResultSetToAuditLog(ResultSet rs) throws SQLException {
+        AuditLog auditLog = new AuditLog();
+        auditLog.setId(rs.getLong("id"));
+        auditLog.setAdminId(rs.getLong("admin_id"));
+        auditLog.setAction(rs.getString("action"));
+        auditLog.setTargetType(rs.getString("target_type"));
+
+        Long targetId = rs.getLong("target_id");
+        if (!rs.wasNull()) {
+            auditLog.setTargetId(targetId);
+        }
+
+        auditLog.setDetails(rs.getString("details"));
+        auditLog.setIpAddress(rs.getString("ip_address"));
+        auditLog.setUserAgent(rs.getString("user_agent"));
+        auditLog.setResult(rs.getInt("result"));
+
+        Timestamp createTime = rs.getTimestamp("create_time");
+        if (createTime != null) {
+            auditLog.setCreateTime(createTime.toLocalDateTime());
+        }
+
+        return auditLog;
+    }
+
+    /**
+     * 根据ID查找审计日志
+     * @param id 日志ID
+     * @return 审计日志，如果不存在则返回null
+     */
+    public AuditLog findById(Long id) {
+        if (id == null) {
+            logger.warn("查找审计日志失败: ID为空");
+            return null;
+        }
+
+        String sql = "SELECT id, admin_id, action, target_type, target_id, details, " +
+                    "ip_address, user_agent, result, create_time " +
+                    "FROM audit_log WHERE id = ?";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) {
+                logger.error("获取数据库连接失败");
+                return null;
+            }
+
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setLong(1, id);
+
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                AuditLog auditLog = mapResultSetToAuditLog(rs);
+                logger.info("查找审计日志成功: ID={}", id);
+                return auditLog;
+            }
+
+            logger.warn("审计日志不存在: ID={}", id);
+            return null;
+        } catch (SQLException e) {
+            logger.error("查找审计日志时发生数据库异常: {}", e.getMessage(), e);
+            return null;
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
     }
 
     /**

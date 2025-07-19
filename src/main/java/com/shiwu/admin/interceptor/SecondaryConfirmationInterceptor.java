@@ -40,6 +40,7 @@ public class SecondaryConfirmationInterceptor implements Filter {
     private static final List<HighRiskOperationMapping> OPERATION_MAPPINGS = Arrays.asList(
             new HighRiskOperationMapping("/api/admin/users/delete", "DELETE_USER_PERMANENTLY"),
             new HighRiskOperationMapping("/api/admin/users/batch-ban", "BATCH_BAN_USERS"),
+            new HighRiskOperationMapping("/api/admin/users/batch-mute", "BATCH_MUTE_USERS"),
             new HighRiskOperationMapping("/api/admin/users/reset-password", "RESET_USER_PASSWORD"),
             new HighRiskOperationMapping("/api/admin/products/delete", "DELETE_PRODUCT_PERMANENTLY"),
             new HighRiskOperationMapping("/api/admin/products/batch-remove", "BATCH_REMOVE_PRODUCTS"),
@@ -96,7 +97,7 @@ public class SecondaryConfirmationInterceptor implements Filter {
             }
             
             // 检查是否为高风险操作
-            String operationCode = getOperationCode(requestURI);
+            String operationCode = getOperationCode(requestURI, httpRequest.getMethod());
             if (operationCode == null) {
                 // 不是高风险操作，直接放行
                 chain.doFilter(request, response);
@@ -147,9 +148,14 @@ public class SecondaryConfirmationInterceptor implements Filter {
     }
     
     /**
-     * 根据请求路径获取操作代码
+     * 根据请求路径和HTTP方法获取操作代码
      */
-    private String getOperationCode(String requestURI) {
+    private String getOperationCode(String requestURI, String httpMethod) {
+        // 特殊处理商品删除路径（包含商品ID）
+        if (requestURI.matches("/api/admin/products/\\d+") && "DELETE".equals(httpMethod)) {
+            return "DELETE_PRODUCT_PERMANENTLY";
+        }
+
         return OPERATION_MAPPINGS.stream()
                 .filter(mapping -> requestURI.startsWith(mapping.getPath()))
                 .map(HighRiskOperationMapping::getOperationCode)
