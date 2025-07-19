@@ -5,6 +5,8 @@ import com.shiwu.common.util.JsonUtil;
 import com.shiwu.order.model.OrderCreateDTO;
 import com.shiwu.order.model.OrderErrorCode;
 import com.shiwu.order.model.OrderOperationResult;
+import com.shiwu.order.model.ProcessReturnRequestDTO;
+import com.shiwu.order.model.ReturnRequestDTO;
 import com.shiwu.order.service.OrderService;
 import com.shiwu.order.service.impl.OrderServiceImpl;
 import org.slf4j.Logger;
@@ -79,6 +81,12 @@ public class OrderController extends HttpServlet {
                 } else if (segments.length > 1 && segments[1].equals("confirm")) {
                     // 买家确认收货
                     handleConfirmReceipt(req, resp, orderId);
+                } else if (segments.length > 1 && segments[1].equals("return")) {
+                    // 买家申请退货
+                    handleApplyForReturn(req, resp, orderId);
+                } else if (segments.length > 1 && segments[1].equals("process-return")) {
+                    // 卖家处理退货申请
+                    handleProcessReturnRequest(req, resp, orderId);
                 } else {
                     sendErrorResponse(resp, "404", "请求路径不存在");
                 }
@@ -319,6 +327,74 @@ public class OrderController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("确认收货失败: orderId={}, userId={}", orderId, userId, e);
+            sendErrorResponse(resp, OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    /**
+     * 处理买家申请退货请求
+     */
+    private void handleApplyForReturn(HttpServletRequest req, HttpServletResponse resp, Long orderId) throws IOException {
+        // 检查用户是否登录
+        Long userId = getCurrentUserId(req);
+        if (userId == null) {
+            sendErrorResponse(resp, "401", "用户未登录");
+            return;
+        }
+
+        try {
+            // 读取请求体
+            String requestBody = readRequestBody(req);
+            ReturnRequestDTO dto = JsonUtil.fromJson(requestBody, ReturnRequestDTO.class);
+
+            if (dto == null) {
+                sendErrorResponse(resp, "400", "请求参数不能为空");
+                return;
+            }
+
+            // 调用订单服务的申请退货方法
+            OrderOperationResult result = orderService.applyForReturn(orderId, dto, userId);
+            if (result.isSuccess()) {
+                sendSuccessResponse(resp, result.getData());
+            } else {
+                sendErrorResponse(resp, result.getErrorCode(), result.getErrorMessage());
+            }
+        } catch (Exception e) {
+            logger.error("申请退货失败: orderId={}, userId={}", orderId, userId, e);
+            sendErrorResponse(resp, OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    /**
+     * 处理卖家处理退货申请请求
+     */
+    private void handleProcessReturnRequest(HttpServletRequest req, HttpServletResponse resp, Long orderId) throws IOException {
+        // 检查用户是否登录
+        Long userId = getCurrentUserId(req);
+        if (userId == null) {
+            sendErrorResponse(resp, "401", "用户未登录");
+            return;
+        }
+
+        try {
+            // 读取请求体
+            String requestBody = readRequestBody(req);
+            ProcessReturnRequestDTO dto = JsonUtil.fromJson(requestBody, ProcessReturnRequestDTO.class);
+
+            if (dto == null) {
+                sendErrorResponse(resp, "400", "请求参数不能为空");
+                return;
+            }
+
+            // 调用订单服务的处理退货申请方法
+            OrderOperationResult result = orderService.processReturnRequest(orderId, dto, userId);
+            if (result.isSuccess()) {
+                sendSuccessResponse(resp, result.getData());
+            } else {
+                sendErrorResponse(resp, result.getErrorCode(), result.getErrorMessage());
+            }
+        } catch (Exception e) {
+            logger.error("处理退货申请失败: orderId={}, userId={}", orderId, userId, e);
             sendErrorResponse(resp, OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
         }
     }
