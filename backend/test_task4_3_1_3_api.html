@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task4_3_1_3 通知API测试工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .auth-section {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-section h3 {
+            color: #34495e;
+            margin-top: 0;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .success {
+            background: #27ae60;
+        }
+        .success:hover {
+            background: #229954;
+        }
+        .warning {
+            background: #f39c12;
+        }
+        .warning:hover {
+            background: #e67e22;
+        }
+        .danger {
+            background: #e74c3c;
+        }
+        .danger:hover {
+            background: #c0392b;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .inline-form {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+        .inline-form .form-group {
+            flex: 1;
+            min-width: 120px;
+        }
+        .notification-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .notification-item.unread {
+            border-left: 4px solid #3498db;
+            background: #f8f9fa;
+        }
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .notification-title {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .notification-type {
+            background: #3498db;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        .notification-content {
+            color: #555;
+            margin-bottom: 10px;
+        }
+        .notification-meta {
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Task4_3_1_3 通知API测试工具</h1>
+        
+        <!-- 认证配置 -->
+        <div class="auth-section">
+            <h3>🔐 认证配置</h3>
+            <div class="form-group">
+                <label for="baseUrl">API基础URL:</label>
+                <input type="text" id="baseUrl" value="http://localhost:8080" placeholder="http://localhost:8080">
+            </div>
+            <div class="form-group">
+                <label for="userId">测试用户ID (X-User-Id Header):</label>
+                <input type="number" id="userId" value="1" placeholder="1">
+            </div>
+            <div class="form-group">
+                <label for="jwtToken">JWT Token (可选):</label>
+                <input type="text" id="jwtToken" placeholder="Bearer token...">
+            </div>
+        </div>
+
+        <!-- 测试1: 获取通知列表 -->
+        <div class="test-section">
+            <h3>📋 测试1: 获取通知列表</h3>
+            <div class="inline-form">
+                <div class="form-group">
+                    <label for="listPage">页码:</label>
+                    <input type="number" id="listPage" value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label for="listSize">每页大小:</label>
+                    <input type="number" id="listSize" value="10" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label for="onlyUnread">只看未读:</label>
+                    <select id="onlyUnread">
+                        <option value="false">所有通知</option>
+                        <option value="true">仅未读</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="testGetNotificationList()">获取通知列表</button>
+                </div>
+            </div>
+            <div id="listResult" class="result" style="display:none;"></div>
+            <div id="notificationDisplay" style="margin-top: 15px;"></div>
+        </div>
+
+        <!-- 测试2: 获取未读数量 -->
+        <div class="test-section">
+            <h3>🔢 测试2: 获取未读通知数量</h3>
+            <button onclick="testGetUnreadCount()">获取未读数量</button>
+            <div id="countResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- 测试3: 标记通知已读 -->
+        <div class="test-section">
+            <h3>✅ 测试3: 标记通知已读</h3>
+            <div class="inline-form">
+                <div class="form-group">
+                    <label for="notificationId">通知ID:</label>
+                    <input type="number" id="notificationId" placeholder="输入通知ID">
+                </div>
+                <div class="form-group">
+                    <button onclick="testMarkAsRead()">标记已读</button>
+                </div>
+            </div>
+            <div id="markResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- 测试4: 批量标记已读 -->
+        <div class="test-section">
+            <h3>✅ 测试4: 批量标记通知已读</h3>
+            <div class="inline-form">
+                <div class="form-group">
+                    <label for="notificationIds">通知ID列表 (逗号分隔，留空表示全部):</label>
+                    <input type="text" id="notificationIds" placeholder="1,2,3 或留空表示全部">
+                </div>
+                <div class="form-group">
+                    <button onclick="testBatchMarkAsRead()" class="warning">批量标记已读</button>
+                </div>
+            </div>
+            <div id="batchResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- 测试5: 综合测试 -->
+        <div class="test-section">
+            <h3>🧪 测试5: 综合功能测试</h3>
+            <button onclick="runComprehensiveTest()" class="success">运行综合测试</button>
+            <div id="comprehensiveResult" class="result" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // 获取API请求头
+        function getHeaders() {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            const jwtToken = document.getElementById('jwtToken').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+            
+            if (jwtToken) {
+                headers['Authorization'] = jwtToken.startsWith('Bearer ') ? jwtToken : `Bearer ${jwtToken}`;
+            } else if (userId) {
+                headers['X-User-Id'] = userId;
+            }
+            
+            return headers;
+        }
+
+        // 获取基础URL
+        function getBaseUrl() {
+            return document.getElementById('baseUrl').value.trim() || 'http://localhost:8080';
+        }
+
+        // 显示结果
+        function showResult(elementId, data, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${isSuccess ? 'success' : 'error'}`;
+            element.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        // 测试1: 获取通知列表
+        async function testGetNotificationList() {
+            try {
+                const page = document.getElementById('listPage').value;
+                const size = document.getElementById('listSize').value;
+                const onlyUnread = document.getElementById('onlyUnread').value;
+                
+                const url = `${getBaseUrl()}/api/notification/list?page=${page}&size=${size}&onlyUnread=${onlyUnread}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('listResult', data, response.ok);
+                
+                // 显示通知列表
+                if (response.ok && data.success && data.data) {
+                    displayNotifications(data.data);
+                }
+                
+            } catch (error) {
+                showResult('listResult', `请求失败: ${error.message}`, false);
+            }
+        }
+
+        // 显示通知列表
+        function displayNotifications(notifications) {
+            const container = document.getElementById('notificationDisplay');
+            
+            if (!notifications || notifications.length === 0) {
+                container.innerHTML = '<p style="color: #888; text-align: center;">暂无通知</p>';
+                return;
+            }
+            
+            const html = notifications.map(notification => `
+                <div class="notification-item ${notification.isRead === 0 ? 'unread' : ''}">
+                    <div class="notification-header">
+                        <span class="notification-title">${notification.title}</span>
+                        <span class="notification-type">${notification.notificationType}</span>
+                    </div>
+                    <div class="notification-content">${notification.content}</div>
+                    <div class="notification-meta">
+                        <span>ID: ${notification.id}</span>
+                        <span>${notification.isRead === 1 ? '已读' : '未读'}</span>
+                        <span>${notification.createTime}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = html;
+        }
+
+        // 测试2: 获取未读数量
+        async function testGetUnreadCount() {
+            try {
+                const url = `${getBaseUrl()}/api/notification/unread-count`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('countResult', data, response.ok);
+                
+            } catch (error) {
+                showResult('countResult', `请求失败: ${error.message}`, false);
+            }
+        }
+
+        // 测试3: 标记通知已读
+        async function testMarkAsRead() {
+            try {
+                const notificationId = document.getElementById('notificationId').value.trim();
+                
+                if (!notificationId) {
+                    showResult('markResult', '请输入通知ID', false);
+                    return;
+                }
+                
+                const url = `${getBaseUrl()}/api/notification/mark-read?id=${notificationId}`;
+                
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('markResult', data, response.ok);
+                
+            } catch (error) {
+                showResult('markResult', `请求失败: ${error.message}`, false);
+            }
+        }
+
+        // 测试4: 批量标记已读
+        async function testBatchMarkAsRead() {
+            try {
+                const notificationIds = document.getElementById('notificationIds').value.trim();
+                
+                let url = `${getBaseUrl()}/api/notification/mark-all-read`;
+                if (notificationIds) {
+                    url += `?ids=${notificationIds}`;
+                }
+                
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('batchResult', data, response.ok);
+                
+            } catch (error) {
+                showResult('batchResult', `请求失败: ${error.message}`, false);
+            }
+        }
+
+        // 测试5: 综合功能测试
+        async function runComprehensiveTest() {
+            let results = [];
+            
+            try {
+                results.push('=== 开始综合功能测试 ===\n');
+                
+                // 1. 获取未读数量
+                results.push('1. 获取未读通知数量...');
+                const countResponse = await fetch(`${getBaseUrl()}/api/notification/unread-count`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                const countData = await countResponse.json();
+                results.push(`   结果: ${countResponse.ok ? '成功' : '失败'} - ${JSON.stringify(countData)}\n`);
+                
+                // 2. 获取通知列表
+                results.push('2. 获取通知列表...');
+                const listResponse = await fetch(`${getBaseUrl()}/api/notification/list?page=1&size=5&onlyUnread=false`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                const listData = await listResponse.json();
+                results.push(`   结果: ${listResponse.ok ? '成功' : '失败'} - 获取到 ${listData.data ? listData.data.length : 0} 条通知\n`);
+                
+                // 3. 获取未读通知列表
+                results.push('3. 获取未读通知列表...');
+                const unreadResponse = await fetch(`${getBaseUrl()}/api/notification/list?page=1&size=5&onlyUnread=true`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                const unreadData = await unreadResponse.json();
+                results.push(`   结果: ${unreadResponse.ok ? '成功' : '失败'} - 获取到 ${unreadData.data ? unreadData.data.length : 0} 条未读通知\n`);
+                
+                // 4. 如果有未读通知，尝试标记第一个已读
+                if (unreadData.data && unreadData.data.length > 0) {
+                    const firstUnread = unreadData.data[0];
+                    results.push(`4. 标记通知 ${firstUnread.id} 为已读...`);
+                    
+                    const markResponse = await fetch(`${getBaseUrl()}/api/notification/mark-read?id=${firstUnread.id}`, {
+                        method: 'PUT',
+                        headers: getHeaders()
+                    });
+                    const markData = await markResponse.json();
+                    results.push(`   结果: ${markResponse.ok ? '成功' : '失败'} - ${JSON.stringify(markData)}\n`);
+                } else {
+                    results.push('4. 跳过标记已读测试（没有未读通知）\n');
+                }
+                
+                // 5. 再次获取未读数量，验证变化
+                results.push('5. 再次获取未读数量，验证变化...');
+                const finalCountResponse = await fetch(`${getBaseUrl()}/api/notification/unread-count`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                const finalCountData = await finalCountResponse.json();
+                results.push(`   结果: ${finalCountResponse.ok ? '成功' : '失败'} - ${JSON.stringify(finalCountData)}\n`);
+                
+                results.push('=== 综合功能测试完成 ===');
+                
+                showResult('comprehensiveResult', results.join('\n'), true);
+                
+            } catch (error) {
+                results.push(`\n测试过程中发生错误: ${error.message}`);
+                showResult('comprehensiveResult', results.join('\n'), false);
+            }
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Task4_3_1_3 通知API测试工具已加载');
+        });
+    </script>
+</body>
+</html>

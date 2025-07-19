@@ -50,7 +50,7 @@ public class RealtimeMessageServiceImpl implements RealtimeMessageService {
     public RealtimeMessageServiceImpl() {
         this.messageDao = new MessageDao();
         this.conversationDao = new ConversationDao();
-        this.messageService = new MessageServiceImpl(messageDao, conversationDao);
+        this.messageService = new MessageServiceImpl();
     }
     
     // 用于测试的构造函数
