@@ -211,18 +211,29 @@ public class UserDaoTest {
      */
     @Test
     public void testCreateUser_DuplicateUsername() {
-        // Given: 使用已存在的用户名
+        // Given: 先创建一个用户
+        String testUsername = "duplicate_test_" + System.currentTimeMillis();
+        User firstUser = new User();
+        firstUser.setUsername(testUsername);
+        firstUser.setPassword("hashedPassword123");
+        firstUser.setNickname("第一个用户");
+        firstUser.setStatus(0);
+
+        // 创建第一个用户
+        Long firstUserId = userDao.createUser(firstUser);
+        assertNotNull(firstUserId, "第一个用户应该创建成功");
+
+        // When: 尝试创建相同用户名的用户
         User duplicateUser = new User();
-        duplicateUser.setUsername("test"); // 假设这个用户名已存在
-        duplicateUser.setPassword("hashedPassword123");
+        duplicateUser.setUsername(testUsername); // 使用相同的用户名
+        duplicateUser.setPassword("hashedPassword456");
         duplicateUser.setNickname("重复用户");
         duplicateUser.setStatus(0);
-        
-        // When: 尝试创建用户
-        Long userId = userDao.createUser(duplicateUser);
-        
+
+        Long duplicateUserId = userDao.createUser(duplicateUser);
+
         // Then: 应该创建失败
-        assertNull(userId, "重复用户名应该创建失败");
+        assertNull(duplicateUserId, "重复用户名应该创建失败");
     }
     
     /**

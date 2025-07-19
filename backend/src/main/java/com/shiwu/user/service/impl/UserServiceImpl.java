@@ -1,13 +1,20 @@
 package com.shiwu.user.service.impl;
 
+import com.shiwu.common.result.Result;
 import com.shiwu.common.util.JwtUtil;
 import com.shiwu.common.util.PasswordUtil;
+import com.shiwu.user.dao.FeedDao;
 import com.shiwu.user.dao.UserDao;
 import com.shiwu.user.dao.UserFollowDao;
 import com.shiwu.user.model.*;
 import com.shiwu.user.service.UserService;
+import com.shiwu.user.vo.FeedItemVO;
+import com.shiwu.user.vo.FeedResponseVO;
+import com.shiwu.user.vo.PaginationVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
 
 /**
  * 用户服务实现类
@@ -20,10 +27,12 @@ public class UserServiceImpl implements UserService {
 
     private final UserDao userDao;
     private final UserFollowDao userFollowDao;
+    private final FeedDao feedDao;
 
     public UserServiceImpl() {
         this.userDao = new UserDao();
         this.userFollowDao = new UserFollowDao();
+        this.feedDao = new FeedDao();
     }
 
     @Override
@@ -109,7 +118,9 @@ public class UserServiceImpl implements UserService {
     @Override
     public RegisterResult register(RegisterRequest registerRequest) {
         // 参数校验
-        if (registerRequest == null || registerRequest.getUsername() == null || registerRequest.getPassword() == null) {
+        if (registerRequest == null ||
+            registerRequest.getUsername() == null || registerRequest.getUsername().trim().isEmpty() ||
+            registerRequest.getPassword() == null || registerRequest.getPassword().trim().isEmpty()) {
             logger.warn("注册失败: 必填参数为空");
             return RegisterResult.fail(RegisterErrorEnum.PARAMETER_ERROR);
         }
@@ -483,6 +494,59 @@ public class UserServiceImpl implements UserService {
             logger.error("获取关注状态过程发生异常: currentUserId={}, targetUserId={}, error={}",
                         currentUserId, targetUserId, e.getMessage(), e);
             return null;
+        }
+    }
+
+    @Override
+    public Result<FeedResponseVO> getFollowingFeed(Long userId, int page, int size, String type) {
+        // 参数校验
+        if (userId == null) {
+            logger.warn("获取关注动态失败: 用户ID为空");
+            return Result.error("用户ID不能为空");
+        }
+
+        if (page < 1) {
+            logger.warn("获取关注动态失败: 页码无效 page={}", page);
+            return Result.error("页码必须大于0");
+        }
+
+        if (size < 1 || size > 100) {
+            logger.warn("获取关注动态失败: 每页大小无效 size={}", size);
+            return Result.error("每页大小必须在1-100之间");
+        }
+
+        // 验证动态类型
+        if (type != null && !"ALL".equals(type) &&
+            !"PRODUCT_APPROVED".equals(type) && !"PRODUCT_PUBLISHED".equals(type)) {
+            logger.warn("获取关注动态失败: 动态类型无效 type={}", type);
+            return Result.error("动态类型无效");
+        }
+
+        try {
+            // 计算偏移量
+            int offset = (page - 1) * size;
+
+            // 获取动态列表
+            List<FeedItemVO> feeds = feedDao.getFollowingFeed(userId, type, offset, size);
+
+            // 获取总数量
+            long total = feedDao.getFollowingFeedCount(userId, type);
+
+            // 构建分页信息
+            PaginationVO pagination = new PaginationVO(page, size, total);
+
+            // 构建响应
+            FeedResponseVO response = new FeedResponseVO(feeds, pagination);
+
+            logger.info("获取关注动态成功: userId={}, type={}, page={}, size={}, total={}",
+                       userId, type, page, size, total);
+
+            return Result.success(response);
+
+        } catch (Exception e) {
+            logger.error("获取关注动态过程发生异常: userId={}, type={}, page={}, size={}, error={}",
+                        userId, type, page, size, e.getMessage(), e);
+            return Result.error("获取关注动态失败");
         }
     }
 
