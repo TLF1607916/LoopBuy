@@ -9,6 +9,9 @@ import com.shiwu.product.dao.AdminProductDao;
 import com.shiwu.product.dao.ProductDao;
 import com.shiwu.product.model.Product;
 import com.shiwu.product.service.AdminProductService;
+import com.shiwu.notification.service.NotificationService;
+import com.shiwu.notification.service.impl.NotificationServiceImpl;
+import com.shiwu.common.result.Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,18 +29,22 @@ public class AdminProductServiceImpl implements AdminProductService {
     private final AdminProductDao adminProductDao;
     private final ProductDao productDao;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     public AdminProductServiceImpl() {
         this.adminProductDao = new AdminProductDao();
         this.productDao = new ProductDao();
         this.auditLogService = new AuditLogServiceImpl();
+        this.notificationService = new NotificationServiceImpl();
     }
 
     // 用于测试的构造函数
-    public AdminProductServiceImpl(AdminProductDao adminProductDao, ProductDao productDao, AuditLogService auditLogService) {
+    public AdminProductServiceImpl(AdminProductDao adminProductDao, ProductDao productDao,
+                                 AuditLogService auditLogService, NotificationService notificationService) {
         this.adminProductDao = adminProductDao;
         this.productDao = productDao;
         this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -137,6 +144,26 @@ public class AdminProductServiceImpl implements AdminProductService {
             
             if (success) {
                 logger.info("管理员 {} 审核通过商品 {} 成功", adminId, productId);
+
+                // Task4_2_1_2: 商品首次审核通过时，为卖家的所有粉丝生成动态通知
+                try {
+                    Result<Integer> notificationResult = notificationService.createProductApprovedNotifications(
+                        productId, product.getSellerId(), product.getTitle());
+
+                    if (notificationResult.isSuccess()) {
+                        int notificationCount = notificationResult.getData();
+                        logger.info("为商品审核通过创建粉丝通知成功: productId={}, sellerId={}, notificationCount={}",
+                                   productId, product.getSellerId(), notificationCount);
+                    } else {
+                        logger.warn("为商品审核通过创建粉丝通知失败: productId={}, error={}",
+                                   productId, notificationResult.getMessage());
+                    }
+                } catch (Exception notificationEx) {
+                    // 通知创建失败不影响审核通过的主流程
+                    logger.error("创建商品审核通过通知时发生异常: productId={}, error={}",
+                               productId, notificationEx.getMessage(), notificationEx);
+                }
+
                 return true;
             } else {
                 logger.warn("审核通过商品失败: 更新状态失败, productId={}", productId);

@@ -552,4 +552,43 @@ public class UserDao {
         }
         DBUtil.closeConnection(conn);
     }
+
+    /**
+     * 获取所有活跃用户ID列表
+     * 用于Task4_2_1_2: 系统公告通知功能
+     *
+     * @return 活跃用户ID列表
+     */
+    public List<Long> getAllActiveUserIds() {
+        String sql = "SELECT id FROM system_user WHERE status = 0 AND is_deleted = 0";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+
+            List<Long> userIds = new ArrayList<>();
+            while (rs.next()) {
+                userIds.add(rs.getLong("id"));
+            }
+
+            logger.debug("获取活跃用户ID列表成功: count={}", userIds.size());
+            return userIds;
+
+        } catch (SQLException e) {
+            logger.error("获取活跃用户ID列表失败: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (pstmt != null) pstmt.close();
+            } catch (SQLException e) {
+                logger.error("关闭数据库资源失败: {}", e.getMessage(), e);
+            }
+            DBUtil.closeConnection(conn);
+        }
+    }
 }
