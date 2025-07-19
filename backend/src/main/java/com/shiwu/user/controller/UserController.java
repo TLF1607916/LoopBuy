@@ -5,6 +5,7 @@ import com.shiwu.common.util.JsonUtil;
 import com.shiwu.user.model.*;
 import com.shiwu.user.service.UserService;
 import com.shiwu.user.service.impl.UserServiceImpl;
+import com.shiwu.user.vo.FeedResponseVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,10 @@ public class UserController extends HttpServlet {
         // 处理 /api/user/{userId}/follow 格式的请求
         else if (pathInfo.matches("^/\\d+/follow$")) {
             handleGetFollowStatus(req, resp);
+        }
+        // 处理 /api/user/follow/feed 格式的请求 (Task4_2_1_3)
+        else if ("/follow/feed".equals(pathInfo)) {
+            handleGetFollowingFeed(req, resp);
         } else {
             sendErrorResponse(resp, "404", "请求路径不存在");
         }
@@ -361,15 +366,70 @@ public class UserController extends HttpServlet {
     }
 
     /**
+     * 处理获取关注动态信息流请求
+     * API: GET /api/user/follow/feed (Task4_2_1_3)
+     */
+    private void handleGetFollowingFeed(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        try {
+            // 获取当前登录用户ID（从JWT token中解析）
+            Long currentUserId = getCurrentUserIdFromToken(req);
+            if (currentUserId == null) {
+                sendErrorResponse(resp, "A0300", "请先登录");
+                return;
+            }
+
+            // 获取查询参数
+            String pageStr = req.getParameter("page");
+            String sizeStr = req.getParameter("size");
+            String type = req.getParameter("type");
+
+            // 设置默认值
+            int page = 1;
+            int size = 20;
+
+            // 解析分页参数
+            try {
+                if (pageStr != null && !pageStr.trim().isEmpty()) {
+                    page = Integer.parseInt(pageStr);
+                }
+                if (sizeStr != null && !sizeStr.trim().isEmpty()) {
+                    size = Integer.parseInt(sizeStr);
+                }
+            } catch (NumberFormatException e) {
+                sendErrorResponse(resp, "A0202", "分页参数格式错误");
+                return;
+            }
+
+            // 设置默认动态类型
+            if (type == null || type.trim().isEmpty()) {
+                type = "ALL";
+            }
+
+            // 调用服务获取关注动态
+            Result<FeedResponseVO> result = userService.getFollowingFeed(currentUserId, page, size, type);
+
+            if (result.isSuccess()) {
+                sendSuccessResponse(resp, result.getData());
+            } else {
+                sendErrorResponse(resp, "B0001", result.getMessage());
+            }
+
+        } catch (Exception e) {
+            logger.error("处理获取关注动态请求失败: {}", e.getMessage(), e);
+            sendErrorResponse(resp, "B0001", "系统执行错误");
+        }
+    }
+
+    /**
      * 发送错误响应
      */
     private void sendErrorResponse(HttpServletResponse resp, String errorCode, String errorMessage) throws IOException {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
-        
+
         Result<Object> result = Result.fail(errorCode, errorMessage);
         String jsonResponse = JsonUtil.toJson(result);
-        
+
         PrintWriter out = resp.getWriter();
         out.print(jsonResponse);
         out.flush();

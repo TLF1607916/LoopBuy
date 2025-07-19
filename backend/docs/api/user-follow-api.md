@@ -256,6 +256,100 @@
 - 并发安全测试
 - 数据一致性测试
 
+### 4. 获取关注动态信息流 (Task4_2_1_3)
+
+**URL**: `GET /api/user/follow/feed`
+**描述**: 获取当前用户关注的卖家的动态信息流
+
+#### 请求参数
+
+##### 查询参数
+| 参数名 | 类型 | 必填 | 默认值 | 描述 |
+|--------|------|------|--------|------|
+| page | Integer | 否 | 1 | 页码，从1开始 |
+| size | Integer | 否 | 20 | 每页大小，最大100 |
+| type | String | 否 | ALL | 动态类型：ALL-全部，PRODUCT_APPROVED-商品审核通过，PRODUCT_PUBLISHED-新商品发布 |
+
+##### 请求头
+| 参数名 | 类型 | 必填 | 描述 |
+|--------|------|------|------|
+| Authorization | String | 是 | JWT令牌 |
+
+#### 响应格式
+
+##### 成功响应 (200 OK)
+```json
+{
+  "success": true,
+  "data": {
+    "feeds": [
+      {
+        "id": 1,
+        "type": "PRODUCT_APPROVED",
+        "title": "您关注的 张三 发布了新商品",
+        "content": "您关注的卖家 张三 刚刚发布了新商品《iPhone 13 Pro 二手》，快来看看吧！",
+        "sellerId": 2,
+        "sellerName": "张三",
+        "sellerAvatar": "/uploads/avatars/2.jpg",
+        "productId": 101,
+        "productTitle": "iPhone 13 Pro 二手",
+        "productImage": "/uploads/products/101_1.jpg",
+        "productPrice": 5999.00,
+        "actionUrl": "/product/101",
+        "createTime": "2024-01-15T10:30:00"
+      },
+      {
+        "id": 2,
+        "type": "PRODUCT_PUBLISHED",
+        "title": "您关注的 李四 发布了新商品",
+        "content": "您关注的卖家 李四 刚刚发布了新商品《MacBook Air M2》，快来看看吧！",
+        "sellerId": 3,
+        "sellerName": "李四",
+        "sellerAvatar": "/uploads/avatars/3.jpg",
+        "productId": 102,
+        "productTitle": "MacBook Air M2",
+        "productImage": "/uploads/products/102_1.jpg",
+        "productPrice": 8999.00,
+        "actionUrl": "/product/102",
+        "createTime": "2024-01-15T09:15:00"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "size": 20,
+      "total": 45,
+      "totalPages": 3,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+##### 失败响应
+
+###### 未登录 (401 Unauthorized)
+```json
+{
+  "success": false,
+  "error": {
+    "code": "A0300",
+    "message": "请先登录"
+  }
+}
+```
+
+###### 参数错误 (400 Bad Request)
+```json
+{
+  "success": false,
+  "error": {
+    "code": "A0202",
+    "message": "分页参数错误"
+  }
+}
+```
+
 ## 使用示例
 
 ### JavaScript/Ajax示例
@@ -323,6 +417,36 @@ function getFollowStatus(userId) {
             updateUserStats(data.data);
         } else {
             console.error('获取关注状态失败:', data.error.message);
+        }
+    })
+    .catch(error => {
+        console.error('请求失败:', error);
+    });
+}
+
+// 获取关注动态信息流 (Task4_2_1_3)
+function getFollowFeed(page = 1, size = 20, type = 'ALL') {
+    const params = new URLSearchParams({
+        page: page,
+        size: size,
+        type: type
+    });
+
+    fetch(`/api/user/follow/feed?${params}`, {
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + getJwtToken()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('获取关注动态成功:', data.data);
+            renderFeedList(data.data.feeds);
+            updatePagination(data.data.pagination);
+        } else {
+            console.error('获取关注动态失败:', data.error.message);
+            showError(data.error.message);
         }
     })
     .catch(error => {
