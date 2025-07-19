@@ -5,11 +5,15 @@ import com.shiwu.common.util.JsonUtil;
 import com.shiwu.order.dao.OrderDao;
 import com.shiwu.order.model.*;
 import com.shiwu.order.service.OrderService;
+import com.shiwu.order.service.RefundService;
 import com.shiwu.product.dao.ProductDao;
 import com.shiwu.product.model.Product;
+import com.shiwu.review.dao.ReviewDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,11 +28,15 @@ public class OrderServiceImpl implements OrderService {
     private final OrderDao orderDao;
     private final ProductDao productDao;
     private final CartDao cartDao;
-    
+    private final ReviewDao reviewDao;
+    private final RefundService refundService;
+
     public OrderServiceImpl() {
         this.orderDao = new OrderDao();
         this.productDao = new ProductDao();
         this.cartDao = new CartDao();
+        this.reviewDao = new ReviewDao();
+        this.refundService = new com.shiwu.order.service.impl.RefundServiceImpl();
     }
     
     @Override
@@ -583,6 +591,232 @@ public class OrderServiceImpl implements OrderService {
 
         } catch (Exception e) {
             logger.error("确认收货时发生异常: orderId={}, buyerId={}, error={}", orderId, buyerId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public OrderOperationResult applyForReturn(Long orderId, ReturnRequestDTO returnRequestDTO, Long buyerId) {
+        // 参数验证
+        if (orderId == null || returnRequestDTO == null || buyerId == null) {
+            logger.warn("申请退货失败: 参数不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+
+        // 验证退货申请数据
+        if (!returnRequestDTO.isValid()) {
+            String validationError = returnRequestDTO.getValidationError();
+            logger.warn("申请退货失败: 退货申请数据无效, error={}", validationError);
+
+            if (validationError.contains("不能为空")) {
+                return OrderOperationResult.failure(OrderErrorCode.RETURN_REQUEST_INVALID_REASON, OrderErrorCode.MSG_RETURN_REQUEST_INVALID_REASON);
+            } else if (validationError.contains("不能超过")) {
+                return OrderOperationResult.failure(OrderErrorCode.RETURN_REQUEST_REASON_TOO_LONG, OrderErrorCode.MSG_RETURN_REQUEST_REASON_TOO_LONG);
+            } else {
+                return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, validationError);
+            }
+        }
+
+        try {
+            // 检查订单是否存在
+            Order order = orderDao.findById(orderId);
+            if (order == null) {
+                logger.warn("申请退货失败: 订单不存在, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_NOT_FOUND, OrderErrorCode.MSG_ORDER_NOT_FOUND);
+            }
+
+            // 权限验证：只有买家可以申请退货
+            if (!order.getBuyerId().equals(buyerId)) {
+                logger.warn("申请退货失败: 无权限申请退货此订单, orderId={}, buyerId={}, actualBuyerId={}",
+                           orderId, buyerId, order.getBuyerId());
+                return OrderOperationResult.failure(OrderErrorCode.RETURN_REQUEST_PERMISSION_DENIED, OrderErrorCode.MSG_RETURN_REQUEST_PERMISSION_DENIED);
+            }
+
+            // 检查订单状态：只有已完成的订单才能申请退货
+            if (!Order.STATUS_COMPLETED.equals(order.getStatus())) {
+                logger.warn("申请退货失败: 订单状态不是已完成, orderId={}, status={}", orderId, order.getStatus());
+                return OrderOperationResult.failure(OrderErrorCode.RETURN_REQUEST_ORDER_NOT_COMPLETED, OrderErrorCode.MSG_RETURN_REQUEST_ORDER_NOT_COMPLETED);
+            }
+
+            // 检查是否已经申请过退货
+            if (Order.STATUS_RETURN_REQUESTED.equals(order.getStatus()) || Order.STATUS_RETURNED.equals(order.getStatus())) {
+                logger.warn("申请退货失败: 订单已经申请过退货, orderId={}, status={}", orderId, order.getStatus());
+                return OrderOperationResult.failure(OrderErrorCode.RETURN_REQUEST_ALREADY_APPLIED, OrderErrorCode.MSG_RETURN_REQUEST_ALREADY_APPLIED);
+            }
+
+            // 检查申请时效：订单完成后7天内可以申请退货
+            LocalDateTime orderUpdateTime = order.getUpdateTime();
+            if (orderUpdateTime != null) {
+                long daysBetween = ChronoUnit.DAYS.between(orderUpdateTime, LocalDateTime.now());
+                if (daysBetween > 7) {
+                    logger.warn("申请退货失败: 申请时间已过期, orderId={}, orderUpdateTime={}, daysBetween={}",
+                               orderId, orderUpdateTime, daysBetween);
+                    return OrderOperationResult.failure(OrderErrorCode.RETURN_REQUEST_TIME_EXPIRED, OrderErrorCode.MSG_RETURN_REQUEST_TIME_EXPIRED);
+                }
+            }
+
+            // 检查订单是否已经评价：根据SRS文档，已评价的订单不能申请退货
+            if (reviewDao.isOrderReviewed(orderId)) {
+                logger.warn("申请退货失败: 订单已经评价过, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.RETURN_REQUEST_ORDER_ALREADY_REVIEWED, OrderErrorCode.MSG_RETURN_REQUEST_ORDER_ALREADY_REVIEWED);
+            }
+
+            // 更新订单状态为申请退货
+            boolean updateSuccess = orderDao.updateOrderStatus(orderId, Order.STATUS_RETURN_REQUESTED);
+            if (!updateSuccess) {
+                logger.error("申请退货失败: 更新订单状态失败, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.APPLY_RETURN_FAILED, OrderErrorCode.MSG_APPLY_RETURN_FAILED);
+            }
+
+            // 构造返回数据
+            Map<String, Object> result = new HashMap<>();
+            result.put("orderId", order.getId());
+            result.put("productId", order.getProductId());
+            result.put("sellerId", order.getSellerId());
+            result.put("reason", returnRequestDTO.getReason());
+            result.put("orderStatus", Order.STATUS_RETURN_REQUESTED);
+            result.put("orderStatusText", getOrderStatusText(Order.STATUS_RETURN_REQUESTED));
+            result.put("message", "申请退货成功，等待卖家处理");
+
+            logger.info("申请退货成功: orderId={}, buyerId={}, reason={}", orderId, buyerId, returnRequestDTO.getReason());
+            return OrderOperationResult.success(result);
+
+        } catch (Exception e) {
+            logger.error("申请退货时发生异常: orderId={}, buyerId={}, error={}", orderId, buyerId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public OrderOperationResult processReturnRequest(Long orderId, ProcessReturnRequestDTO processReturnRequestDTO, Long sellerId) {
+        // 参数验证
+        if (orderId == null || processReturnRequestDTO == null || sellerId == null) {
+            logger.warn("处理退货申请失败: 参数不能为空");
+            return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, OrderErrorCode.MSG_INVALID_PARAMS);
+        }
+
+        // 验证处理退货申请数据
+        if (!processReturnRequestDTO.isValid()) {
+            String validationError = processReturnRequestDTO.getValidationError();
+            logger.warn("处理退货申请失败: 处理数据无效, error={}", validationError);
+
+            if (validationError.contains("处理决定不能为空")) {
+                return OrderOperationResult.failure(OrderErrorCode.PROCESS_RETURN_INVALID_DECISION, OrderErrorCode.MSG_PROCESS_RETURN_INVALID_DECISION);
+            } else if (validationError.contains("必须填写拒绝原因")) {
+                return OrderOperationResult.failure(OrderErrorCode.PROCESS_RETURN_MISSING_REJECT_REASON, OrderErrorCode.MSG_PROCESS_RETURN_MISSING_REJECT_REASON);
+            } else if (validationError.contains("不能超过")) {
+                return OrderOperationResult.failure(OrderErrorCode.PROCESS_RETURN_REJECT_REASON_TOO_LONG, OrderErrorCode.MSG_PROCESS_RETURN_REJECT_REASON_TOO_LONG);
+            } else {
+                return OrderOperationResult.failure(OrderErrorCode.INVALID_PARAMS, validationError);
+            }
+        }
+
+        try {
+            // 检查订单是否存在
+            Order order = orderDao.findById(orderId);
+            if (order == null) {
+                logger.warn("处理退货申请失败: 订单不存在, orderId={}", orderId);
+                return OrderOperationResult.failure(OrderErrorCode.ORDER_NOT_FOUND, OrderErrorCode.MSG_ORDER_NOT_FOUND);
+            }
+
+            // 权限验证：只有卖家可以处理退货申请
+            if (!order.getSellerId().equals(sellerId)) {
+                logger.warn("处理退货申请失败: 无权限处理此退货申请, orderId={}, sellerId={}, actualSellerId={}",
+                           orderId, sellerId, order.getSellerId());
+                return OrderOperationResult.failure(OrderErrorCode.PROCESS_RETURN_PERMISSION_DENIED, OrderErrorCode.MSG_PROCESS_RETURN_PERMISSION_DENIED);
+            }
+
+            // 检查订单状态：只有申请退货状态的订单才能处理
+            if (!Order.STATUS_RETURN_REQUESTED.equals(order.getStatus())) {
+                logger.warn("处理退货申请失败: 订单状态不是申请退货, orderId={}, status={}", orderId, order.getStatus());
+                return OrderOperationResult.failure(OrderErrorCode.PROCESS_RETURN_ORDER_NOT_RETURN_REQUESTED, OrderErrorCode.MSG_PROCESS_RETURN_ORDER_NOT_RETURN_REQUESTED);
+            }
+
+            // 根据处理决定执行不同的逻辑
+            if (processReturnRequestDTO.isApproved()) {
+                // 同意退货：RETURN_REQUESTED → RETURNED
+                return processApproveReturn(order, processReturnRequestDTO);
+            } else {
+                // 拒绝退货：RETURN_REQUESTED → COMPLETED
+                return processRejectReturn(order, processReturnRequestDTO);
+            }
+
+        } catch (Exception e) {
+            logger.error("处理退货申请时发生异常: orderId={}, sellerId={}, error={}", orderId, sellerId, e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    /**
+     * 处理同意退货的逻辑
+     */
+    private OrderOperationResult processApproveReturn(Order order, ProcessReturnRequestDTO processReturnRequestDTO) {
+        try {
+            // 执行模拟退款操作
+            RefundTransaction refundTransaction = refundService.processRefund(order, "卖家同意退货申请");
+            if (refundTransaction == null || !refundTransaction.isSuccess()) {
+                logger.error("同意退货失败: 模拟退款操作失败, orderId={}", order.getId());
+                return OrderOperationResult.failure(OrderErrorCode.SIMULATE_REFUND_FAILED, OrderErrorCode.MSG_SIMULATE_REFUND_FAILED);
+            }
+
+            // 更新订单状态为已退货
+            boolean updateSuccess = orderDao.updateOrderStatus(order.getId(), Order.STATUS_RETURNED);
+            if (!updateSuccess) {
+                logger.error("同意退货失败: 更新订单状态失败, orderId={}", order.getId());
+                return OrderOperationResult.failure(OrderErrorCode.PROCESS_RETURN_FAILED, OrderErrorCode.MSG_PROCESS_RETURN_FAILED);
+            }
+
+            // 构造返回数据
+            Map<String, Object> result = new HashMap<>();
+            result.put("orderId", order.getId());
+            result.put("productId", order.getProductId());
+            result.put("buyerId", order.getBuyerId());
+            result.put("approved", true);
+            result.put("orderStatus", Order.STATUS_RETURNED);
+            result.put("orderStatusText", getOrderStatusText(Order.STATUS_RETURNED));
+            result.put("refundId", refundTransaction.getRefundId());
+            result.put("refundAmount", refundTransaction.getRefundAmount());
+            result.put("message", "已同意退货申请，退款已处理");
+
+            logger.info("同意退货成功: orderId={}, sellerId={}, refundId={}",
+                       order.getId(), order.getSellerId(), refundTransaction.getRefundId());
+            return OrderOperationResult.success(result);
+
+        } catch (Exception e) {
+            logger.error("处理同意退货时发生异常: orderId={}, error={}", order.getId(), e.getMessage(), e);
+            return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
+        }
+    }
+
+    /**
+     * 处理拒绝退货的逻辑
+     */
+    private OrderOperationResult processRejectReturn(Order order, ProcessReturnRequestDTO processReturnRequestDTO) {
+        try {
+            // 更新订单状态为已完成（恢复原状态）
+            boolean updateSuccess = orderDao.updateOrderStatus(order.getId(), Order.STATUS_COMPLETED);
+            if (!updateSuccess) {
+                logger.error("拒绝退货失败: 更新订单状态失败, orderId={}", order.getId());
+                return OrderOperationResult.failure(OrderErrorCode.PROCESS_RETURN_FAILED, OrderErrorCode.MSG_PROCESS_RETURN_FAILED);
+            }
+
+            // 构造返回数据
+            Map<String, Object> result = new HashMap<>();
+            result.put("orderId", order.getId());
+            result.put("productId", order.getProductId());
+            result.put("buyerId", order.getBuyerId());
+            result.put("approved", false);
+            result.put("rejectReason", processReturnRequestDTO.getRejectReason());
+            result.put("orderStatus", Order.STATUS_COMPLETED);
+            result.put("orderStatusText", getOrderStatusText(Order.STATUS_COMPLETED));
+            result.put("message", "已拒绝退货申请，订单状态恢复为已完成");
+
+            logger.info("拒绝退货成功: orderId={}, sellerId={}, rejectReason={}",
+                       order.getId(), order.getSellerId(), processReturnRequestDTO.getRejectReason());
+            return OrderOperationResult.success(result);
+
+        } catch (Exception e) {
+            logger.error("处理拒绝退货时发生异常: orderId={}, error={}", order.getId(), e.getMessage(), e);
             return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
         }
     }

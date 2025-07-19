@@ -81,4 +81,22 @@ public interface OrderService {
      * @return 订单操作结果
      */
     OrderOperationResult confirmReceipt(Long orderId, Long buyerId);
+
+    /**
+     * 买家申请退货
+     * @param orderId 订单ID
+     * @param returnRequestDTO 退货申请数据
+     * @param buyerId 买家用户ID（用于权限验证）
+     * @return 订单操作结果
+     */
+    OrderOperationResult applyForReturn(Long orderId, com.shiwu.order.model.ReturnRequestDTO returnRequestDTO, Long buyerId);
+
+    /**
+     * 卖家处理退货申请
+     * @param orderId 订单ID
+     * @param processReturnRequestDTO 处理退货申请数据
+     * @param sellerId 卖家用户ID（用于权限验证）
+     * @return 订单操作结果
+     */
+    OrderOperationResult processReturnRequest(Long orderId, com.shiwu.order.model.ProcessReturnRequestDTO processReturnRequestDTO, Long sellerId);
 }
