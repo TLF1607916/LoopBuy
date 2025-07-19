@@ -1,12 +1,13 @@
 package com.shiwu.product.service.impl;
 
-import com.shiwu.admin.dao.AuditLogDao;
+import com.shiwu.admin.enums.AuditActionEnum;
+import com.shiwu.admin.enums.AuditTargetTypeEnum;
 import com.shiwu.admin.model.AdminProductQueryDTO;
-import com.shiwu.admin.model.AuditLog;
+import com.shiwu.admin.service.AuditLogService;
+import com.shiwu.admin.service.impl.AuditLogServiceImpl;
 import com.shiwu.product.dao.AdminProductDao;
 import com.shiwu.product.dao.ProductDao;
 import com.shiwu.product.model.Product;
-import com.shiwu.product.model.ProductDetailVO;
 import com.shiwu.product.service.AdminProductService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,25 +18,26 @@ import java.util.Map;
 
 /**
  * 管理员商品服务实现类
+ * 实现NFR-SEC-03要求，在所有敏感操作中嵌入审计日志记录
  */
 public class AdminProductServiceImpl implements AdminProductService {
     private static final Logger logger = LoggerFactory.getLogger(AdminProductServiceImpl.class);
     
     private final AdminProductDao adminProductDao;
     private final ProductDao productDao;
-    private final AuditLogDao auditLogDao;
+    private final AuditLogService auditLogService;
 
     public AdminProductServiceImpl() {
         this.adminProductDao = new AdminProductDao();
         this.productDao = new ProductDao();
-        this.auditLogDao = new AuditLogDao();
+        this.auditLogService = new AuditLogServiceImpl();
     }
 
     // 用于测试的构造函数
-    public AdminProductServiceImpl(AdminProductDao adminProductDao, ProductDao productDao, AuditLogDao auditLogDao) {
+    public AdminProductServiceImpl(AdminProductDao adminProductDao, ProductDao productDao, AuditLogService auditLogService) {
         this.adminProductDao = adminProductDao;
         this.productDao = productDao;
-        this.auditLogDao = auditLogDao;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -48,19 +50,17 @@ public class AdminProductServiceImpl implements AdminProductService {
         try {
             // 查询商品列表
             List<Map<String, Object>> products = adminProductDao.findProducts(queryDTO);
-            
+
             // 查询总数
-            int totalCount = adminProductDao.countProducts(queryDTO);
-            
-            // 计算分页信息
-            int totalPages = (int) Math.ceil((double) totalCount / queryDTO.getPageSize());
-            
+            long totalCount = adminProductDao.countProducts(queryDTO);
+
+            // 构建返回结果
             Map<String, Object> result = new HashMap<>();
             result.put("products", products);
             result.put("totalCount", totalCount);
-            result.put("totalPages", totalPages);
-            result.put("currentPage", queryDTO.getPageNum());
+            result.put("page", queryDTO.getPageNum());
             result.put("pageSize", queryDTO.getPageSize());
+            result.put("totalPages", (totalCount + queryDTO.getPageSize() - 1) / queryDTO.getPageSize());
             
             logger.info("查询商品列表成功: 共{}条记录", totalCount);
             return result;
@@ -78,16 +78,16 @@ public class AdminProductServiceImpl implements AdminProductService {
         }
 
         try {
-            // 管理员可以查看所有商品详情
-            ProductDetailVO productDetail = productDao.findProductDetailById(productId);
+            // 管理员可以查看所有商品详情（包括被删除的商品）
+            Product product = productDao.findById(productId);
             
-            if (productDetail == null) {
+            if (product == null) {
                 logger.warn("获取商品详情失败: 商品不存在, productId={}", productId);
                 return null;
             }
 
             Map<String, Object> result = new HashMap<>();
-            result.put("product", productDetail);
+            result.put("product", product);
             
             logger.info("管理员 {} 获取商品详情成功: productId={}", adminId, productId);
             return result;
@@ -98,37 +98,44 @@ public class AdminProductServiceImpl implements AdminProductService {
     }
 
     @Override
-    public boolean approveProduct(Long productId, Long adminId, String reason) {
+    public boolean approveProduct(Long productId, Long adminId, String reason, String ipAddress, String userAgent) {
         if (productId == null || adminId == null) {
             logger.warn("审核通过商品失败: 参数为空");
             return false;
         }
 
         try {
-            // 检查商品是否存在且为待审核状态
+            // 检查商品是否存在
             Product product = productDao.findById(productId);
             if (product == null) {
                 logger.warn("审核通过商品失败: 商品不存在, productId={}", productId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_APPROVE, AuditTargetTypeEnum.PRODUCT, 
+                                         productId, "审核通过商品失败: 商品不存在" + (reason != null ? ", 备注: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
+            // 检查商品当前状态
             if (!Product.STATUS_PENDING_REVIEW.equals(product.getStatus())) {
-                logger.warn("审核通过商品失败: 商品状态不是待审核, productId={}, status={}", 
-                           productId, product.getStatus());
+                logger.warn("审核通过商品失败: 商品状态不是待审核, productId={}, status={}", productId, product.getStatus());
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_APPROVE, AuditTargetTypeEnum.PRODUCT, 
+                                         productId, "审核通过商品失败: 商品状态不是待审核" + (reason != null ? ", 备注: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
-            // 更新商品状态为在售
+            // 更新商品状态为上架
             boolean success = adminProductDao.updateProductStatus(productId, Product.STATUS_ONSALE, adminId);
             
+            // 记录审计日志
+            String details = "审核通过商品: " + product.getTitle() + " (ID: " + productId + ")" + 
+                           (reason != null ? ", 备注: " + reason : "");
+            auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_APPROVE, AuditTargetTypeEnum.PRODUCT, 
+                                     productId, details, ipAddress, userAgent, success);
+            
             if (success) {
-                // 记录审计日志
-                AuditLog auditLog = new AuditLog();
-                auditLog.setAdminId(adminId);
-                auditLog.setAction("PRODUCT_APPROVE");
-                auditLog.setDetails("审核通过商品: " + productId + (reason != null ? ", 备注: " + reason : ""));
-                auditLogDao.createAuditLog(auditLog);
-
                 logger.info("管理员 {} 审核通过商品 {} 成功", adminId, productId);
                 return true;
             } else {
@@ -137,47 +144,57 @@ public class AdminProductServiceImpl implements AdminProductService {
             }
         } catch (Exception e) {
             logger.error("审核通过商品失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_APPROVE, AuditTargetTypeEnum.PRODUCT, 
+                                     productId, "审核通过商品异常: " + e.getMessage() + (reason != null ? ", 备注: " + reason : ""), 
+                                     ipAddress, userAgent, false);
             return false;
         }
     }
 
     @Override
-    public boolean rejectProduct(Long productId, Long adminId, String reason) {
+    public boolean rejectProduct(Long productId, Long adminId, String reason, String ipAddress, String userAgent) {
         if (productId == null || adminId == null) {
             logger.warn("审核拒绝商品失败: 参数为空");
             return false;
         }
 
         if (reason == null || reason.trim().isEmpty()) {
-            logger.warn("审核拒绝商品失败: 拒绝原因为空");
+            logger.warn("审核拒绝商品失败: 拒绝原因不能为空");
             return false;
         }
 
         try {
-            // 检查商品是否存在且为待审核状态
+            // 检查商品是否存在
             Product product = productDao.findById(productId);
             if (product == null) {
                 logger.warn("审核拒绝商品失败: 商品不存在, productId={}", productId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_REJECT, AuditTargetTypeEnum.PRODUCT, 
+                                         productId, "审核拒绝商品失败: 商品不存在, 原因: " + reason, 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
+            // 检查商品当前状态
             if (!Product.STATUS_PENDING_REVIEW.equals(product.getStatus())) {
-                logger.warn("审核拒绝商品失败: 商品状态不是待审核, productId={}, status={}", 
-                           productId, product.getStatus());
+                logger.warn("审核拒绝商品失败: 商品状态不是待审核, productId={}, status={}", productId, product.getStatus());
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_REJECT, AuditTargetTypeEnum.PRODUCT, 
+                                         productId, "审核拒绝商品失败: 商品状态不是待审核, 原因: " + reason, 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
-            // 更新商品状态为草稿（拒绝后回到草稿状态，用户可以修改后重新提交）
+            // 更新商品状态为草稿
             boolean success = adminProductDao.updateProductStatus(productId, Product.STATUS_DRAFT, adminId);
             
+            // 记录审计日志
+            String details = "审核拒绝商品: " + product.getTitle() + " (ID: " + productId + "), 原因: " + reason;
+            auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_REJECT, AuditTargetTypeEnum.PRODUCT, 
+                                     productId, details, ipAddress, userAgent, success);
+            
             if (success) {
-                // 记录审计日志
-                AuditLog auditLog = new AuditLog();
-                auditLog.setAdminId(adminId);
-                auditLog.setAction("PRODUCT_REJECT");
-                auditLog.setDetails("审核拒绝商品: " + productId + ", 原因: " + reason);
-                auditLogDao.createAuditLog(auditLog);
-
                 logger.info("管理员 {} 审核拒绝商品 {} 成功, 原因: {}", adminId, productId, reason);
                 return true;
             } else {
@@ -186,42 +203,53 @@ public class AdminProductServiceImpl implements AdminProductService {
             }
         } catch (Exception e) {
             logger.error("审核拒绝商品失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_REJECT, AuditTargetTypeEnum.PRODUCT, 
+                                     productId, "审核拒绝商品异常: " + e.getMessage() + ", 原因: " + reason, 
+                                     ipAddress, userAgent, false);
             return false;
         }
     }
 
     @Override
-    public boolean delistProduct(Long productId, Long adminId, String reason) {
+    public boolean delistProduct(Long productId, Long adminId, String reason, String ipAddress, String userAgent) {
         if (productId == null || adminId == null) {
             logger.warn("下架商品失败: 参数为空");
             return false;
         }
 
         try {
-            // 检查商品是否存在且为在售状态
+            // 检查商品是否存在
             Product product = productDao.findById(productId);
             if (product == null) {
                 logger.warn("下架商品失败: 商品不存在, productId={}", productId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_TAKEDOWN, AuditTargetTypeEnum.PRODUCT, 
+                                         productId, "下架商品失败: 商品不存在" + (reason != null ? ", 原因: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
+            // 检查商品当前状态
             if (!Product.STATUS_ONSALE.equals(product.getStatus())) {
-                logger.warn("下架商品失败: 商品状态不是在售, productId={}, status={}", 
-                           productId, product.getStatus());
+                logger.warn("下架商品失败: 商品状态不是在售, productId={}, status={}", productId, product.getStatus());
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_TAKEDOWN, AuditTargetTypeEnum.PRODUCT, 
+                                         productId, "下架商品失败: 商品状态不是在售" + (reason != null ? ", 原因: " + reason : ""), 
+                                         ipAddress, userAgent, false);
                 return false;
             }
 
-            // 更新商品状态为已下架
+            // 更新商品状态为下架
             boolean success = adminProductDao.updateProductStatus(productId, Product.STATUS_DELISTED, adminId);
             
+            // 记录审计日志
+            String details = "下架商品: " + product.getTitle() + " (ID: " + productId + ")" + 
+                           (reason != null ? ", 原因: " + reason : "");
+            auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_TAKEDOWN, AuditTargetTypeEnum.PRODUCT, 
+                                     productId, details, ipAddress, userAgent, success);
+            
             if (success) {
-                // 记录审计日志
-                AuditLog auditLog = new AuditLog();
-                auditLog.setAdminId(adminId);
-                auditLog.setAction("PRODUCT_DELIST");
-                auditLog.setDetails("下架商品: " + productId + (reason != null ? ", 原因: " + reason : ""));
-                auditLogDao.createAuditLog(auditLog);
-
                 logger.info("管理员 {} 下架商品 {} 成功", adminId, productId);
                 return true;
             } else {
@@ -230,12 +258,16 @@ public class AdminProductServiceImpl implements AdminProductService {
             }
         } catch (Exception e) {
             logger.error("下架商品失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_TAKEDOWN, AuditTargetTypeEnum.PRODUCT, 
+                                     productId, "下架商品异常: " + e.getMessage() + (reason != null ? ", 原因: " + reason : ""), 
+                                     ipAddress, userAgent, false);
             return false;
         }
     }
 
     @Override
-    public boolean deleteProduct(Long productId, Long adminId) {
+    public boolean deleteProduct(Long productId, Long adminId, String ipAddress, String userAgent) {
         if (productId == null || adminId == null) {
             logger.warn("删除商品失败: 参数为空");
             return false;
@@ -246,20 +278,21 @@ public class AdminProductServiceImpl implements AdminProductService {
             Product product = productDao.findById(productId);
             if (product == null) {
                 logger.warn("删除商品失败: 商品不存在, productId={}", productId);
+                // 记录失败的审计日志
+                auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_DELETE, AuditTargetTypeEnum.PRODUCT, 
+                                         productId, "删除商品失败: 商品不存在", ipAddress, userAgent, false);
                 return false;
             }
 
             // 软删除商品
             boolean success = adminProductDao.deleteProduct(productId, adminId);
             
-            if (success) {
-                // 记录审计日志
-                AuditLog auditLog = new AuditLog();
-                auditLog.setAdminId(adminId);
-                auditLog.setAction("PRODUCT_DELETE");
-                auditLog.setDetails("删除商品: " + productId);
-                auditLogDao.createAuditLog(auditLog);
+            // 记录审计日志
+            String details = "删除商品: " + product.getTitle() + " (ID: " + productId + ")";
+            auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_DELETE, AuditTargetTypeEnum.PRODUCT, 
+                                     productId, details, ipAddress, userAgent, success);
 
+            if (success) {
                 logger.info("管理员 {} 删除商品 {} 成功", adminId, productId);
                 return true;
             } else {
@@ -268,6 +301,9 @@ public class AdminProductServiceImpl implements AdminProductService {
             }
         } catch (Exception e) {
             logger.error("删除商品失败: {}", e.getMessage(), e);
+            // 记录异常的审计日志
+            auditLogService.logAction(adminId, AuditActionEnum.PRODUCT_DELETE, AuditTargetTypeEnum.PRODUCT, 
+                                     productId, "删除商品异常: " + e.getMessage(), ipAddress, userAgent, false);
             return false;
         }
     }

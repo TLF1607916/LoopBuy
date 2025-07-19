@@ -209,14 +209,18 @@ public class AdminProductController extends HttpServlet {
     /**
      * 处理审核通过商品请求
      */
-    private void handleApproveProduct(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long productId) 
+    private void handleApproveProduct(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long productId)
             throws IOException {
         try {
             // 解析请求体
             AdminProductManageDTO manageDTO = parseRequestBody(req, AdminProductManageDTO.class);
-            
-            boolean success = adminProductService.approveProduct(productId, adminId, manageDTO.getReason());
-            
+
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            boolean success = adminProductService.approveProduct(productId, adminId, manageDTO.getReason(), ipAddress, userAgent);
+
             if (success) {
                 sendSuccessResponse(resp, null, "商品审核通过");
                 logger.info("管理员 {} 审核通过商品 {}", adminId, productId);
@@ -232,19 +236,23 @@ public class AdminProductController extends HttpServlet {
     /**
      * 处理审核拒绝商品请求
      */
-    private void handleRejectProduct(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long productId) 
+    private void handleRejectProduct(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long productId)
             throws IOException {
         try {
             // 解析请求体
             AdminProductManageDTO manageDTO = parseRequestBody(req, AdminProductManageDTO.class);
-            
+
             if (manageDTO.getReason() == null || manageDTO.getReason().trim().isEmpty()) {
                 sendErrorResponse(resp, "400", "拒绝原因不能为空");
                 return;
             }
-            
-            boolean success = adminProductService.rejectProduct(productId, adminId, manageDTO.getReason());
-            
+
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            boolean success = adminProductService.rejectProduct(productId, adminId, manageDTO.getReason(), ipAddress, userAgent);
+
             if (success) {
                 sendSuccessResponse(resp, null, "商品审核拒绝");
                 logger.info("管理员 {} 审核拒绝商品 {}, 原因: {}", adminId, productId, manageDTO.getReason());
@@ -266,7 +274,11 @@ public class AdminProductController extends HttpServlet {
             // 解析请求体
             AdminProductManageDTO manageDTO = parseRequestBody(req, AdminProductManageDTO.class);
             
-            boolean success = adminProductService.delistProduct(productId, adminId, manageDTO.getReason());
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            boolean success = adminProductService.delistProduct(productId, adminId, manageDTO.getReason(), ipAddress, userAgent);
             
             if (success) {
                 sendSuccessResponse(resp, null, "商品下架成功");
@@ -286,7 +298,11 @@ public class AdminProductController extends HttpServlet {
     private void handleDeleteProduct(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long productId) 
             throws IOException {
         try {
-            boolean success = adminProductService.deleteProduct(productId, adminId);
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            boolean success = adminProductService.deleteProduct(productId, adminId, ipAddress, userAgent);
             
             if (success) {
                 sendSuccessResponse(resp, null, "商品删除成功");
@@ -380,5 +396,34 @@ public class AdminProductController extends HttpServlet {
         resp.setContentType("application/json;charset=UTF-8");
         Result<Object> result = Result.fail(code, message);
         resp.getWriter().write(objectMapper.writeValueAsString(result));
+    }
+
+    /**
+     * 获取客户端IP地址
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+        String ipAddress = request.getHeader("X-Forwarded-For");
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getRemoteAddr();
+        }
+
+        // 如果是多个IP地址，取第一个
+        if (ipAddress != null && ipAddress.contains(",")) {
+            ipAddress = ipAddress.split(",")[0].trim();
+        }
+
+        return ipAddress;
     }
 }

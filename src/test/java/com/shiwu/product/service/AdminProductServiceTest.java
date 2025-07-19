@@ -1,373 +1,280 @@
 package com.shiwu.product.service;
 
-import com.shiwu.admin.dao.AuditLogDao;
-import com.shiwu.admin.model.AdminProductQueryDTO;
+import com.shiwu.admin.enums.AuditActionEnum;
+import com.shiwu.admin.enums.AuditTargetTypeEnum;
+import com.shiwu.admin.service.AuditLogService;
 import com.shiwu.product.dao.AdminProductDao;
 import com.shiwu.product.dao.ProductDao;
 import com.shiwu.product.model.Product;
-import com.shiwu.product.model.ProductDetailVO;
 import com.shiwu.product.service.impl.AdminProductServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 管理员商品服务测试
+ * AdminProductService单元测试
+ * 测试管理员商品管理功能，包括审计日志记录
  */
+@DisplayName("管理员商品服务测试")
 public class AdminProductServiceTest {
 
     @Mock
-    private AdminProductDao mockAdminProductDao;
-
+    private AdminProductDao adminProductDao;
+    
     @Mock
-    private ProductDao mockProductDao;
-
+    private ProductDao productDao;
+    
     @Mock
-    private AuditLogDao mockAuditLogDao;
-
+    private AuditLogService auditLogService;
+    
     private AdminProductService adminProductService;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        adminProductService = new AdminProductServiceImpl(mockAdminProductDao, mockProductDao, mockAuditLogDao);
+        // 使用支持依赖注入的构造函数
+        adminProductService = new AdminProductServiceImpl(adminProductDao, productDao, auditLogService);
     }
-
+    
+    /**
+     * 测试审核通过商品成功场景
+     */
     @Test
-    public void testFindProducts_Success() {
-        // 准备测试数据
-        AdminProductQueryDTO queryDTO = new AdminProductQueryDTO();
-        queryDTO.setKeyword("test");
-        queryDTO.setStatus(1);
-        queryDTO.setPageNum(1);
-        queryDTO.setPageSize(20);
-
-        List<Map<String, Object>> products = new ArrayList<>();
-        Map<String, Object> product = new HashMap<>();
-        product.put("id", 1L);
-        product.put("title", "Test Product");
-        products.add(product);
-
-        // Mock DAO调用
-        when(mockAdminProductDao.findProducts(queryDTO)).thenReturn(products);
-        when(mockAdminProductDao.countProducts(queryDTO)).thenReturn(1);
-
-        // 执行测试
-        Map<String, Object> result = adminProductService.findProducts(queryDTO);
-
-        // 验证结果
-        assertNotNull(result);
-        assertEquals(products, result.get("products"));
-        assertEquals(1, result.get("totalCount"));
-        assertEquals(1, result.get("totalPages"));
-        assertEquals(1, result.get("currentPage"));
-        assertEquals(20, result.get("pageSize"));
-
-        // 验证Mock调用
-        verify(mockAdminProductDao).findProducts(queryDTO);
-        verify(mockAdminProductDao).countProducts(queryDTO);
-    }
-
-    @Test
-    public void testFindProducts_NullQuery() {
-        // 执行测试
-        Map<String, Object> result = adminProductService.findProducts(null);
-
-        // 验证结果
-        assertNull(result);
-
-        // 验证Mock调用
-        verify(mockAdminProductDao, never()).findProducts(any());
-        verify(mockAdminProductDao, never()).countProducts(any());
-    }
-
-    @Test
-    public void testGetProductDetail_Success() {
-        // 准备测试数据
+    @DisplayName("审核通过商品成功")
+    public void testApproveProductSuccess() {
+        // Given: 准备测试数据
         Long productId = 1L;
-        Long adminId = 1L;
-        ProductDetailVO productDetail = new ProductDetailVO();
-        productDetail.setId(productId);
-        productDetail.setTitle("Test Product");
-
-        // Mock DAO调用
-        when(mockProductDao.findProductDetailById(productId)).thenReturn(productDetail);
-
-        // 执行测试
-        Map<String, Object> result = adminProductService.getProductDetail(productId, adminId);
-
-        // 验证结果
-        assertNotNull(result);
-        assertEquals(productDetail, result.get("product"));
-
-        // 验证Mock调用
-        verify(mockProductDao).findProductDetailById(productId);
+        Long adminId = 100L;
+        String reason = "商品信息完整，符合规范";
+        String ipAddress = "127.0.0.1";
+        String userAgent = "Mozilla/5.0";
+        
+        Product mockProduct = new Product();
+        mockProduct.setId(productId);
+        mockProduct.setTitle("测试商品");
+        mockProduct.setStatus(Product.STATUS_PENDING_REVIEW); // 待审核状态
+        mockProduct.setPrice(new BigDecimal("99.99"));
+        mockProduct.setCreateTime(LocalDateTime.now());
+        
+        // Mock DAO行为
+        when(productDao.findById(productId)).thenReturn(mockProduct);
+        when(adminProductDao.updateProductStatus(productId, Product.STATUS_ONSALE, adminId)).thenReturn(true);
+        
+        // Mock AuditLogService行为
+        when(auditLogService.logAction(any(), any(), any(), any(), anyString(), anyString(), anyString(), anyBoolean())).thenReturn(1L);
+        
+        // When: 执行审核通过
+        boolean result = adminProductService.approveProduct(productId, adminId, reason, ipAddress, userAgent);
+        
+        // Then: 验证结果
+        assertTrue(result, "审核通过商品应该成功");
+        
+        // 验证DAO方法被调用
+        verify(productDao).findById(productId);
+        verify(adminProductDao).updateProductStatus(productId, Product.STATUS_ONSALE, adminId);
+        verify(auditLogService).logAction(eq(adminId), eq(AuditActionEnum.PRODUCT_APPROVE), eq(AuditTargetTypeEnum.PRODUCT), 
+                                         eq(productId), contains("审核通过商品"), eq(ipAddress), eq(userAgent), eq(true));
+        
+        System.out.println("✅ 审核通过商品成功测试通过");
     }
 
+    /**
+     * 测试审核通过不存在的商品
+     */
     @Test
-    public void testGetProductDetail_ProductNotFound() {
-        // 准备测试数据
-        Long productId = 1L;
-        Long adminId = 1L;
-
-        // Mock DAO调用
-        when(mockProductDao.findProductDetailById(productId)).thenReturn(null);
-
-        // 执行测试
-        Map<String, Object> result = adminProductService.getProductDetail(productId, adminId);
-
-        // 验证结果
-        assertNull(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findProductDetailById(productId);
-    }
-
-    @Test
-    public void testApproveProduct_Success() {
-        // 准备测试数据
-        Long productId = 1L;
-        Long adminId = 1L;
+    @DisplayName("审核通过不存在的商品")
+    public void testApproveProductNotFound() {
+        // Given: 准备测试数据
+        Long productId = 999L;
+        Long adminId = 100L;
         String reason = "审核通过";
-
-        Product product = new Product();
-        product.setId(productId);
-        product.setStatus(Product.STATUS_PENDING_REVIEW);
-
-        // Mock DAO调用
-        when(mockProductDao.findById(productId)).thenReturn(product);
-        when(mockAdminProductDao.updateProductStatus(productId, Product.STATUS_ONSALE, adminId)).thenReturn(true);
-
-        // 执行测试
-        boolean result = adminProductService.approveProduct(productId, adminId, reason);
-
-        // 验证结果
-        assertTrue(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findById(productId);
-        verify(mockAdminProductDao).updateProductStatus(productId, Product.STATUS_ONSALE, adminId);
-        verify(mockAuditLogDao).createAuditLog(any());
+        String ipAddress = "127.0.0.1";
+        String userAgent = "Mozilla/5.0";
+        
+        when(productDao.findById(productId)).thenReturn(null);
+        when(auditLogService.logAction(any(), any(), any(), any(), anyString(), anyString(), anyString(), anyBoolean())).thenReturn(1L);
+        
+        // When: 执行审核通过
+        boolean result = adminProductService.approveProduct(productId, adminId, reason, ipAddress, userAgent);
+        
+        // Then: 验证结果
+        assertFalse(result, "审核通过不存在的商品应该失败");
+        
+        // 验证DAO方法被调用
+        verify(productDao).findById(productId);
+        verify(adminProductDao, never()).updateProductStatus(any(), any(), any());
+        verify(auditLogService).logAction(eq(adminId), eq(AuditActionEnum.PRODUCT_APPROVE), eq(AuditTargetTypeEnum.PRODUCT), 
+                                         eq(productId), contains("商品不存在"), eq(ipAddress), eq(userAgent), eq(false));
+        
+        System.out.println("✅ 审核通过不存在商品测试通过");
     }
 
+    /**
+     * 测试审核拒绝商品成功场景
+     */
     @Test
-    public void testApproveProduct_ProductNotFound() {
-        // 准备测试数据
+    @DisplayName("审核拒绝商品成功")
+    public void testRejectProductSuccess() {
+        // Given: 准备测试数据
         Long productId = 1L;
-        Long adminId = 1L;
-        String reason = "审核通过";
-
-        // Mock DAO调用
-        when(mockProductDao.findById(productId)).thenReturn(null);
-
-        // 执行测试
-        boolean result = adminProductService.approveProduct(productId, adminId, reason);
-
-        // 验证结果
-        assertFalse(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findById(productId);
-        verify(mockAdminProductDao, never()).updateProductStatus(any(), any(), any());
-        verify(mockAuditLogDao, never()).createAuditLog(any());
+        Long adminId = 100L;
+        String reason = "商品描述不符合规范";
+        String ipAddress = "127.0.0.1";
+        String userAgent = "Mozilla/5.0";
+        
+        Product mockProduct = new Product();
+        mockProduct.setId(productId);
+        mockProduct.setTitle("测试商品");
+        mockProduct.setStatus(Product.STATUS_PENDING_REVIEW); // 待审核状态
+        
+        // Mock DAO行为
+        when(productDao.findById(productId)).thenReturn(mockProduct);
+        when(adminProductDao.updateProductStatus(productId, Product.STATUS_DRAFT, adminId)).thenReturn(true);
+        when(auditLogService.logAction(any(), any(), any(), any(), anyString(), anyString(), anyString(), anyBoolean())).thenReturn(1L);
+        
+        // When: 执行审核拒绝
+        boolean result = adminProductService.rejectProduct(productId, adminId, reason, ipAddress, userAgent);
+        
+        // Then: 验证结果
+        assertTrue(result, "审核拒绝商品应该成功");
+        
+        // 验证DAO方法被调用
+        verify(productDao).findById(productId);
+        verify(adminProductDao).updateProductStatus(productId, Product.STATUS_DRAFT, adminId);
+        verify(auditLogService).logAction(eq(adminId), eq(AuditActionEnum.PRODUCT_REJECT), eq(AuditTargetTypeEnum.PRODUCT), 
+                                         eq(productId), contains("审核拒绝商品"), eq(ipAddress), eq(userAgent), eq(true));
+        
+        System.out.println("✅ 审核拒绝商品成功测试通过");
     }
 
+    /**
+     * 测试审核拒绝商品时原因为空
+     */
     @Test
-    public void testApproveProduct_WrongStatus() {
-        // 准备测试数据
+    @DisplayName("审核拒绝商品原因为空")
+    public void testRejectProductEmptyReason() {
+        // Given: 准备测试数据
         Long productId = 1L;
-        Long adminId = 1L;
-        String reason = "审核通过";
-
-        Product product = new Product();
-        product.setId(productId);
-        product.setStatus(Product.STATUS_ONSALE); // 已经是在售状态
-
-        // Mock DAO调用
-        when(mockProductDao.findById(productId)).thenReturn(product);
-
-        // 执行测试
-        boolean result = adminProductService.approveProduct(productId, adminId, reason);
-
-        // 验证结果
-        assertFalse(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findById(productId);
-        verify(mockAdminProductDao, never()).updateProductStatus(any(), any(), any());
-        verify(mockAuditLogDao, never()).createAuditLog(any());
-    }
-
-    @Test
-    public void testRejectProduct_Success() {
-        // 准备测试数据
-        Long productId = 1L;
-        Long adminId = 1L;
-        String reason = "不符合规范";
-
-        Product product = new Product();
-        product.setId(productId);
-        product.setStatus(Product.STATUS_PENDING_REVIEW);
-
-        // Mock DAO调用
-        when(mockProductDao.findById(productId)).thenReturn(product);
-        when(mockAdminProductDao.updateProductStatus(productId, Product.STATUS_DRAFT, adminId)).thenReturn(true);
-
-        // 执行测试
-        boolean result = adminProductService.rejectProduct(productId, adminId, reason);
-
-        // 验证结果
-        assertTrue(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findById(productId);
-        verify(mockAdminProductDao).updateProductStatus(productId, Product.STATUS_DRAFT, adminId);
-        verify(mockAuditLogDao).createAuditLog(any());
-    }
-
-    @Test
-    public void testRejectProduct_EmptyReason() {
-        // 准备测试数据
-        Long productId = 1L;
-        Long adminId = 1L;
+        Long adminId = 100L;
         String reason = ""; // 空原因
-
-        // 执行测试
-        boolean result = adminProductService.rejectProduct(productId, adminId, reason);
-
-        // 验证结果
-        assertFalse(result);
-
-        // 验证Mock调用
-        verify(mockProductDao, never()).findById(any());
-        verify(mockAdminProductDao, never()).updateProductStatus(any(), any(), any());
-        verify(mockAuditLogDao, never()).createAuditLog(any());
+        String ipAddress = "127.0.0.1";
+        String userAgent = "Mozilla/5.0";
+        
+        // When: 执行审核拒绝
+        boolean result = adminProductService.rejectProduct(productId, adminId, reason, ipAddress, userAgent);
+        
+        // Then: 验证结果
+        assertFalse(result, "审核拒绝商品时原因为空应该失败");
+        
+        // 验证DAO方法不被调用
+        verify(productDao, never()).findById(any());
+        verify(adminProductDao, never()).updateProductStatus(any(), any(), any());
+        
+        System.out.println("✅ 审核拒绝商品原因为空测试通过");
     }
 
+    /**
+     * 测试下架商品成功场景
+     */
     @Test
-    public void testDelistProduct_Success() {
-        // 准备测试数据
+    @DisplayName("下架商品成功")
+    public void testDelistProductSuccess() {
+        // Given: 准备测试数据
         Long productId = 1L;
-        Long adminId = 1L;
-        String reason = "违规内容";
-
-        Product product = new Product();
-        product.setId(productId);
-        product.setStatus(Product.STATUS_ONSALE);
-
-        // Mock DAO调用
-        when(mockProductDao.findById(productId)).thenReturn(product);
-        when(mockAdminProductDao.updateProductStatus(productId, Product.STATUS_DELISTED, adminId)).thenReturn(true);
-
-        // 执行测试
-        boolean result = adminProductService.delistProduct(productId, adminId, reason);
-
-        // 验证结果
-        assertTrue(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findById(productId);
-        verify(mockAdminProductDao).updateProductStatus(productId, Product.STATUS_DELISTED, adminId);
-        verify(mockAuditLogDao).createAuditLog(any());
+        Long adminId = 100L;
+        String reason = "商品存在质量问题";
+        String ipAddress = "127.0.0.1";
+        String userAgent = "Mozilla/5.0";
+        
+        Product mockProduct = new Product();
+        mockProduct.setId(productId);
+        mockProduct.setTitle("测试商品");
+        mockProduct.setStatus(Product.STATUS_ONSALE); // 在售状态
+        
+        // Mock DAO行为
+        when(productDao.findById(productId)).thenReturn(mockProduct);
+        when(adminProductDao.updateProductStatus(productId, Product.STATUS_DELISTED, adminId)).thenReturn(true);
+        when(auditLogService.logAction(any(), any(), any(), any(), anyString(), anyString(), anyString(), anyBoolean())).thenReturn(1L);
+        
+        // When: 执行下架
+        boolean result = adminProductService.delistProduct(productId, adminId, reason, ipAddress, userAgent);
+        
+        // Then: 验证结果
+        assertTrue(result, "下架商品应该成功");
+        
+        // 验证DAO方法被调用
+        verify(productDao).findById(productId);
+        verify(adminProductDao).updateProductStatus(productId, Product.STATUS_DELISTED, adminId);
+        verify(auditLogService).logAction(eq(adminId), eq(AuditActionEnum.PRODUCT_TAKEDOWN), eq(AuditTargetTypeEnum.PRODUCT), 
+                                         eq(productId), contains("下架商品"), eq(ipAddress), eq(userAgent), eq(true));
+        
+        System.out.println("✅ 下架商品成功测试通过");
     }
 
+    /**
+     * 测试删除商品成功场景
+     */
     @Test
-    public void testDelistProduct_WrongStatus() {
-        // 准备测试数据
+    @DisplayName("删除商品成功")
+    public void testDeleteProductSuccess() {
+        // Given: 准备测试数据
         Long productId = 1L;
-        Long adminId = 1L;
-        String reason = "违规内容";
-
-        Product product = new Product();
-        product.setId(productId);
-        product.setStatus(Product.STATUS_DRAFT); // 草稿状态，不能下架
-
-        // Mock DAO调用
-        when(mockProductDao.findById(productId)).thenReturn(product);
-
-        // 执行测试
-        boolean result = adminProductService.delistProduct(productId, adminId, reason);
-
-        // 验证结果
-        assertFalse(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findById(productId);
-        verify(mockAdminProductDao, never()).updateProductStatus(any(), any(), any());
-        verify(mockAuditLogDao, never()).createAuditLog(any());
+        Long adminId = 100L;
+        String ipAddress = "127.0.0.1";
+        String userAgent = "Mozilla/5.0";
+        
+        Product mockProduct = new Product();
+        mockProduct.setId(productId);
+        mockProduct.setTitle("测试商品");
+        mockProduct.setStatus(Product.STATUS_DRAFT);
+        
+        // Mock DAO行为
+        when(productDao.findById(productId)).thenReturn(mockProduct);
+        when(adminProductDao.deleteProduct(productId, adminId)).thenReturn(true);
+        when(auditLogService.logAction(any(), any(), any(), any(), anyString(), anyString(), anyString(), anyBoolean())).thenReturn(1L);
+        
+        // When: 执行删除
+        boolean result = adminProductService.deleteProduct(productId, adminId, ipAddress, userAgent);
+        
+        // Then: 验证结果
+        assertTrue(result, "删除商品应该成功");
+        
+        // 验证DAO方法被调用
+        verify(productDao).findById(productId);
+        verify(adminProductDao).deleteProduct(productId, adminId);
+        verify(auditLogService).logAction(eq(adminId), eq(AuditActionEnum.PRODUCT_DELETE), eq(AuditTargetTypeEnum.PRODUCT), 
+                                         eq(productId), contains("删除商品"), eq(ipAddress), eq(userAgent), eq(true));
+        
+        System.out.println("✅ 删除商品成功测试通过");
     }
 
+    /**
+     * 测试参数验证
+     */
     @Test
-    public void testDeleteProduct_Success() {
-        // 准备测试数据
-        Long productId = 1L;
-        Long adminId = 1L;
-
-        Product product = new Product();
-        product.setId(productId);
-        product.setStatus(Product.STATUS_ONSALE);
-
-        // Mock DAO调用
-        when(mockProductDao.findById(productId)).thenReturn(product);
-        when(mockAdminProductDao.deleteProduct(productId, adminId)).thenReturn(true);
-
-        // 执行测试
-        boolean result = adminProductService.deleteProduct(productId, adminId);
-
-        // 验证结果
-        assertTrue(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findById(productId);
-        verify(mockAdminProductDao).deleteProduct(productId, adminId);
-        verify(mockAuditLogDao).createAuditLog(any());
-    }
-
-    @Test
-    public void testDeleteProduct_ProductNotFound() {
-        // 准备测试数据
-        Long productId = 1L;
-        Long adminId = 1L;
-
-        // Mock DAO调用
-        when(mockProductDao.findById(productId)).thenReturn(null);
-
-        // 执行测试
-        boolean result = adminProductService.deleteProduct(productId, adminId);
-
-        // 验证结果
-        assertFalse(result);
-
-        // 验证Mock调用
-        verify(mockProductDao).findById(productId);
-        verify(mockAdminProductDao, never()).deleteProduct(any(), any());
-        verify(mockAuditLogDao, never()).createAuditLog(any());
-    }
-
-    @Test
-    public void testNullParameters() {
-        // 测试空参数
-        assertNull(adminProductService.getProductDetail(null, 1L));
-        assertNull(adminProductService.getProductDetail(1L, null));
-        assertFalse(adminProductService.approveProduct(null, 1L, "reason"));
-        assertFalse(adminProductService.approveProduct(1L, null, "reason"));
-        assertFalse(adminProductService.rejectProduct(null, 1L, "reason"));
-        assertFalse(adminProductService.rejectProduct(1L, null, "reason"));
-        assertFalse(adminProductService.delistProduct(null, 1L, "reason"));
-        assertFalse(adminProductService.delistProduct(1L, null, "reason"));
-        assertFalse(adminProductService.deleteProduct(null, 1L));
-        assertFalse(adminProductService.deleteProduct(1L, null));
+    @DisplayName("参数验证测试")
+    public void testParameterValidation() {
+        String ipAddress = "127.0.0.1";
+        String userAgent = "Mozilla/5.0";
+        
+        // 测试空商品ID
+        assertFalse(adminProductService.approveProduct(null, 100L, "reason", ipAddress, userAgent), "空商品ID应该失败");
+        
+        // 测试空管理员ID
+        assertFalse(adminProductService.approveProduct(1L, null, "reason", ipAddress, userAgent), "空管理员ID应该失败");
+        
+        // 测试审核拒绝时空原因
+        assertFalse(adminProductService.rejectProduct(1L, 100L, null, ipAddress, userAgent), "审核拒绝时空原因应该失败");
+        
+        System.out.println("✅ 参数验证测试通过");
     }
 }

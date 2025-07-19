@@ -218,14 +218,18 @@ public class AdminUserController extends HttpServlet {
     /**
      * 处理封禁用户请求
      */
-    private void handleBanUser(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long userId) 
+    private void handleBanUser(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long userId)
             throws IOException {
         try {
             // 解析请求体
             AdminUserManageDTO manageDTO = parseRequestBody(req, AdminUserManageDTO.class);
-            
-            boolean success = adminUserService.banUser(userId, adminId, manageDTO.getReason());
-            
+
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            boolean success = adminUserService.banUser(userId, adminId, manageDTO.getReason(), ipAddress, userAgent);
+
             if (success) {
                 sendSuccessResponse(resp, null, "用户封禁成功");
                 logger.info("管理员 {} 封禁用户 {}", adminId, userId);
@@ -241,14 +245,18 @@ public class AdminUserController extends HttpServlet {
     /**
      * 处理禁言用户请求
      */
-    private void handleMuteUser(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long userId) 
+    private void handleMuteUser(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long userId)
             throws IOException {
         try {
             // 解析请求体
             AdminUserManageDTO manageDTO = parseRequestBody(req, AdminUserManageDTO.class);
-            
-            boolean success = adminUserService.muteUser(userId, adminId, manageDTO.getReason());
-            
+
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            boolean success = adminUserService.muteUser(userId, adminId, manageDTO.getReason(), ipAddress, userAgent);
+
             if (success) {
                 sendSuccessResponse(resp, null, "用户禁言成功");
                 logger.info("管理员 {} 禁言用户 {}", adminId, userId);
@@ -264,11 +272,15 @@ public class AdminUserController extends HttpServlet {
     /**
      * 处理解封用户请求
      */
-    private void handleUnbanUser(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long userId) 
+    private void handleUnbanUser(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long userId)
             throws IOException {
         try {
-            boolean success = adminUserService.unbanUser(userId, adminId);
-            
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            boolean success = adminUserService.unbanUser(userId, adminId, ipAddress, userAgent);
+
             if (success) {
                 sendSuccessResponse(resp, null, "用户解封成功");
                 logger.info("管理员 {} 解封用户 {}", adminId, userId);
@@ -284,11 +296,15 @@ public class AdminUserController extends HttpServlet {
     /**
      * 处理解除禁言请求
      */
-    private void handleUnmuteUser(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long userId) 
+    private void handleUnmuteUser(HttpServletRequest req, HttpServletResponse resp, Long adminId, Long userId)
             throws IOException {
         try {
-            boolean success = adminUserService.unmuteUser(userId, adminId);
-            
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            boolean success = adminUserService.unmuteUser(userId, adminId, ipAddress, userAgent);
+
             if (success) {
                 sendSuccessResponse(resp, null, "用户解除禁言成功");
                 logger.info("管理员 {} 解除用户 {} 禁言", adminId, userId);
@@ -314,8 +330,12 @@ public class AdminUserController extends HttpServlet {
                 sendErrorResponse(resp, "400", "用户ID列表不能为空");
                 return;
             }
-            
-            Map<String, Object> result = adminUserService.batchBanUsers(manageDTO.getUserIds(), adminId, manageDTO.getReason());
+
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            Map<String, Object> result = adminUserService.batchBanUsers(manageDTO.getUserIds(), adminId, manageDTO.getReason(), ipAddress, userAgent);
             
             sendSuccessResponse(resp, result, "批量封禁操作完成");
             logger.info("管理员 {} 批量封禁用户: {}", adminId, manageDTO.getUserIds());
@@ -338,8 +358,12 @@ public class AdminUserController extends HttpServlet {
                 sendErrorResponse(resp, "400", "用户ID列表不能为空");
                 return;
             }
-            
-            Map<String, Object> result = adminUserService.batchMuteUsers(manageDTO.getUserIds(), adminId, manageDTO.getReason());
+
+            // 获取IP地址和用户代理
+            String ipAddress = getClientIpAddress(req);
+            String userAgent = req.getHeader("User-Agent");
+
+            Map<String, Object> result = adminUserService.batchMuteUsers(manageDTO.getUserIds(), adminId, manageDTO.getReason(), ipAddress, userAgent);
             
             sendSuccessResponse(resp, result, "批量禁言操作完成");
             logger.info("管理员 {} 批量禁言用户: {}", adminId, manageDTO.getUserIds());
@@ -411,5 +435,34 @@ public class AdminUserController extends HttpServlet {
         resp.setContentType("application/json;charset=UTF-8");
         Result<Object> result = Result.fail(code, message);
         resp.getWriter().write(objectMapper.writeValueAsString(result));
+    }
+
+    /**
+     * 获取客户端IP地址
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+        String ipAddress = request.getHeader("X-Forwarded-For");
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getRemoteAddr();
+        }
+
+        // 如果是多个IP地址，取第一个
+        if (ipAddress != null && ipAddress.contains(",")) {
+            ipAddress = ipAddress.split(",")[0].trim();
+        }
+
+        return ipAddress;
     }
 }
