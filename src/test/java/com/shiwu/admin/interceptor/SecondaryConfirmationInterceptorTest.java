@@ -9,6 +9,7 @@ import org.mockito.MockitoAnnotations;
 
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
@@ -277,16 +278,15 @@ public class SecondaryConfirmationInterceptorTest {
      * 可测试的SecondaryConfirmationInterceptor，支持依赖注入
      */
     private static class TestableSecondaryConfirmationInterceptor extends SecondaryConfirmationInterceptor {
-        private final AdminService adminService;
-        
+
         public TestableSecondaryConfirmationInterceptor(AdminService adminService) {
             this.adminService = adminService;
         }
-        
+
         @Override
-        public void init(FilterConfig filterConfig) {
-            // 重写初始化方法，使用注入的adminService
-            // 在实际实现中需要修改父类来支持依赖注入
+        public void init(FilterConfig filterConfig) throws ServletException {
+            // 调用父类初始化，但adminService已经在构造函数中设置
+            super.init(filterConfig);
         }
     }
 }

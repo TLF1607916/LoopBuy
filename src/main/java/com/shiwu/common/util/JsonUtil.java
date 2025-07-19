@@ -36,6 +36,9 @@ public class JsonUtil {
      * @return 转换后的对象
      */
     public static <T> T fromJson(String json, Class<T> clazz) {
+        if (json == null || json.trim().isEmpty()) {
+            return null;
+        }
         try {
             return objectMapper.readValue(json, clazz);
         } catch (IOException e) {

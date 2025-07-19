@@ -1,4 +1,4 @@
-package com.shiwu.test.dao;
+package com.shiwu.product.test.dao;
 
 import com.shiwu.common.util.DBUtil;
 import com.shiwu.product.dao.ProductDao;

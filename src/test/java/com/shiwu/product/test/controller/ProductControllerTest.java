@@ -1,4 +1,4 @@
-package com.shiwu.test.controller;
+package com.shiwu.product.test.controller;
 
 import com.shiwu.common.result.Result;
 import com.shiwu.common.util.JsonUtil;

@@ -1,4 +1,4 @@
-package com.shiwu.integration;
+package com.shiwu.product.integration;
 
 import com.shiwu.product.dao.ProductDao;
 import com.shiwu.product.model.Product;
@@ -6,7 +6,7 @@ import com.shiwu.product.model.ProductCreateDTO;
 import com.shiwu.product.model.ProductDetailVO;
 import com.shiwu.product.service.ProductService;
 import com.shiwu.product.service.impl.ProductServiceImpl;
-import com.shiwu.test.util.ProductTestUtil;
+import com.shiwu.product.test.util.ProductTestUtil;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;

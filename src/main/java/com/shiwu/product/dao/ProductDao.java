@@ -581,6 +581,184 @@ public class ProductDao {
         return productDetail;
     }
 
+    // ====================================================================
+    // 统计查询方法（用于管理员仪表盘）
+    // ====================================================================
+
+    /**
+     * 获取商品总数
+     * @return 商品总数
+     */
+    public Long getTotalProductCount() {
+        String sql = "SELECT COUNT(*) FROM product WHERE is_deleted = 0";
+        return executeCountQuery(sql);
+    }
+
+    /**
+     * 获取指定状态的商品数
+     * @param status 商品状态
+     * @return 商品数
+     */
+    public Long getProductCountByStatus(Integer status) {
+        String sql = "SELECT COUNT(*) FROM product WHERE is_deleted = 0 AND status = ?";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, status);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("查询指定状态商品数失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
+    }
+
+    /**
+     * 获取指定时间段内新增商品数
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 新增商品数
+     */
+    public Long getNewProductCount(LocalDateTime startTime, LocalDateTime endTime) {
+        String sql = "SELECT COUNT(*) FROM product WHERE is_deleted = 0 AND create_time >= ? AND create_time < ?";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setObject(1, startTime);
+            pstmt.setObject(2, endTime);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("查询新增商品数失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
+    }
+
+    /**
+     * 获取商品增长趋势数据（按天统计）
+     * @param days 统计天数
+     * @return 趋势数据列表，每个元素包含日期和当天新增商品数
+     */
+    public List<Map<String, Object>> getProductGrowthTrend(int days) {
+        String sql = "SELECT DATE(create_time) as date, COUNT(*) as count " +
+                    "FROM product " +
+                    "WHERE is_deleted = 0 AND create_time >= DATE_SUB(NOW(), INTERVAL ? DAY) " +
+                    "GROUP BY DATE(create_time) " +
+                    "ORDER BY date";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        List<Map<String, Object>> trendData = new ArrayList<>();
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, days);
+            rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("date", rs.getDate("date").toString());
+                data.put("count", rs.getLong("count"));
+                trendData.add(data);
+            }
+        } catch (SQLException e) {
+            logger.error("查询商品增长趋势失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return trendData;
+    }
+
+    /**
+     * 获取商品状态分布统计
+     * @return 状态分布数据，key为状态值，value为数量
+     */
+    public Map<Integer, Long> getProductStatusDistribution() {
+        String sql = "SELECT status, COUNT(*) as count FROM product WHERE is_deleted = 0 GROUP BY status";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Map<Integer, Long> distribution = new HashMap<>();
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                Integer status = rs.getInt("status");
+                Long count = rs.getLong("count");
+                distribution.put(status, count);
+            }
+        } catch (SQLException e) {
+            logger.error("查询商品状态分布失败: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return distribution;
+    }
+
+    /**
+     * 执行计数查询的通用方法
+     * @param sql SQL查询语句
+     * @return 计数结果
+     */
+    private Long executeCountQuery(String sql) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Long count = 0L;
+
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) {
+                logger.error("数据库连接为空");
+                return count;
+            }
+
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            logger.error("执行计数查询失败: {}", e.getMessage(), e);
+        } catch (Exception e) {
+            logger.error("执行计数查询时发生未知异常: {}", e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return count;
+    }
+
     /**
      * 关闭数据库资源
      */
@@ -601,4 +779,4 @@ public class ProductDao {
         }
         DBUtil.closeConnection(conn);
     }
-} 
+}
