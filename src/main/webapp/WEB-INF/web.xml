@@ -11,13 +11,5 @@
         <welcome-file>index.html</welcome-file>
     </welcome-file-list>
 
-    <!-- 配置Servlet映射 -->
-    <servlet>
-        <servlet-name>UserController</servlet-name>
-        <servlet-class>com.shiwu.user.controller.UserController</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>UserController</servlet-name>
-        <url-pattern>/api/user/*</url-pattern>
-    </servlet-mapping>
+    <!-- Servlet映射通过@WebServlet注解配置 -->
 </web-app>

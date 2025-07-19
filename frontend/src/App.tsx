@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from './modules/auth/pages/LoginPage'
 import DashboardPage from './modules/dashboard/pages/DashboardPage'
 import ProductManagementPage from './modules/product-management/pages/ProductManagementPage'
+import UserManagementPage from './modules/user-management/pages/UserManagementPage'
+import AuditLogPage from './modules/audit-log/pages/AuditLogPage'
 import { AuthProvider } from './modules/auth/contexts/AuthContext'
 import ProtectedRoute from './modules/auth/components/ProtectedRoute'
 import './App.css'
@@ -27,6 +29,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProductManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <UserManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/audit-logs"
+              element={
+                <ProtectedRoute>
+                  <AuditLogPage />
                 </ProtectedRoute>
               }
             />
