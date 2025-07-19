@@ -26,7 +26,12 @@ public class MessageVO {
      * 发送者用户ID
      */
     private Long senderId;
-    
+
+    /**
+     * 接收者用户ID
+     */
+    private Long receiverId;
+
     /**
      * 发送者用户名
      */
@@ -71,6 +76,11 @@ public class MessageVO {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 发送时间（别名，用于兼容）
+     */
+    private LocalDateTime sendTime;
     
     // ==================== 构造函数 ====================
     
@@ -113,7 +123,15 @@ public class MessageVO {
     public void setSenderId(Long senderId) {
         this.senderId = senderId;
     }
-    
+
+    public Long getReceiverId() {
+        return receiverId;
+    }
+
+    public void setReceiverId(Long receiverId) {
+        this.receiverId = receiverId;
+    }
+
     public String getSenderUsername() {
         return senderUsername;
     }
@@ -185,7 +203,24 @@ public class MessageVO {
     public void setCreateTime(LocalDateTime createTime) {
         this.createTime = createTime;
     }
-    
+
+    public LocalDateTime getSendTime() {
+        return sendTime != null ? sendTime : createTime;
+    }
+
+    public void setSendTime(LocalDateTime sendTime) {
+        this.sendTime = sendTime;
+    }
+
+    // 兼容性方法
+    public Boolean getIsRead() {
+        return read;
+    }
+
+    public void setIsRead(Boolean isRead) {
+        this.read = isRead;
+    }
+
     @Override
     public String toString() {
         return "MessageVO{" +

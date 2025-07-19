@@ -3,6 +3,9 @@ package com.shiwu.message.dao;
 import com.shiwu.message.model.Message;
 import com.shiwu.common.util.DBUtil;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -21,6 +24,8 @@ import java.util.List;
  * @version 1.0
  */
 public class MessageDao {
+
+    private static final Logger logger = LoggerFactory.getLogger(MessageDao.class);
     
     /**
      * 插入新消息
@@ -246,5 +251,98 @@ public class MessageDao {
         }
         
         return message;
+    }
+
+    /**
+     * 标记消息为已读
+     */
+    public boolean markMessagesAsRead(String conversationId, Long userId) {
+        String sql = "UPDATE message SET is_read = 1, update_time = CURRENT_TIMESTAMP " +
+                    "WHERE conversation_id = ? AND receiver_id = ? AND is_read = 0 AND is_deleted = 0";
+
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, conversationId);
+            stmt.setLong(2, userId);
+            int rowsAffected = stmt.executeUpdate();
+
+            logger.info("标记消息已读成功: conversationId={}, userId={}, count={}",
+                       conversationId, userId, rowsAffected);
+            return true;
+
+        } catch (SQLException e) {
+            logger.error("标记消息已读时发生数据库错误: conversationId={}, userId={}",
+                        conversationId, userId, e);
+            throw new RuntimeException("标记消息已读时发生数据库错误", e);
+        }
+    }
+
+    /**
+     * 获取用户的新消息（用于轮询）
+     */
+    public List<Message> findNewMessagesByUserId(Long userId, LocalDateTime lastTime) {
+        String sql = "SELECT id, conversation_id, sender_id, receiver_id, product_id, " +
+                    "content, message_type, is_read, create_time, update_time, is_deleted " +
+                    "FROM message " +
+                    "WHERE receiver_id = ? AND create_time > ? AND is_deleted = 0 " +
+                    "ORDER BY create_time ASC " +
+                    "LIMIT 100";
+
+        List<Message> messages = new ArrayList<>();
+
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, userId);
+            stmt.setTimestamp(2, Timestamp.valueOf(lastTime));
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    messages.add(mapResultSetToMessage(rs));
+                }
+            }
+
+            logger.debug("查询新消息成功: userId={}, count={}", userId, messages.size());
+
+        } catch (SQLException e) {
+            logger.error("查询新消息时发生数据库错误: userId={}", userId, e);
+            throw new RuntimeException("查询新消息时发生数据库错误", e);
+        }
+
+        return messages;
+    }
+
+    /**
+     * 获取会话的最新消息
+     */
+    public Message findLatestMessageByConversationId(String conversationId) {
+        String sql = "SELECT id, conversation_id, sender_id, receiver_id, product_id, " +
+                    "content, message_type, is_read, create_time, update_time, is_deleted " +
+                    "FROM message " +
+                    "WHERE conversation_id = ? AND is_deleted = 0 " +
+                    "ORDER BY create_time DESC " +
+                    "LIMIT 1";
+
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, conversationId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Message message = mapResultSetToMessage(rs);
+                    logger.debug("查询最新消息成功: conversationId={}, messageId={}",
+                               conversationId, message.getId());
+                    return message;
+                }
+            }
+
+        } catch (SQLException e) {
+            logger.error("查询最新消息时发生数据库错误: conversationId={}", conversationId, e);
+            throw new RuntimeException("查询最新消息时发生数据库错误", e);
+        }
+
+        return null;
     }
 }

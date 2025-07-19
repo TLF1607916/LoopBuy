@@ -3,6 +3,9 @@ package com.shiwu.message.dao;
 import com.shiwu.message.model.Conversation;
 import com.shiwu.common.util.DBUtil;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -21,6 +24,8 @@ import java.util.List;
  * @version 1.0
  */
 public class ConversationDao {
+
+    private static final Logger logger = LoggerFactory.getLogger(ConversationDao.class);
     
     /**
      * 插入新会话
@@ -295,5 +300,70 @@ public class ConversationDao {
         }
         
         return conversation;
+    }
+
+
+
+    /**
+     * 获取用户的总未读消息数量
+     */
+    public int getTotalUnreadCount(Long userId) {
+        String sql = "SELECT " +
+                    "SUM(CASE WHEN participant1_id = ? THEN unread_count1 ELSE 0 END) + " +
+                    "SUM(CASE WHEN participant2_id = ? THEN unread_count2 ELSE 0 END) AS total_unread " +
+                    "FROM conversation " +
+                    "WHERE (participant1_id = ? OR participant2_id = ?) AND is_deleted = 0";
+
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, userId);
+            stmt.setLong(2, userId);
+            stmt.setLong(3, userId);
+            stmt.setLong(4, userId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    int totalUnread = rs.getInt("total_unread");
+                    logger.debug("查询总未读数量成功: userId={}, count={}", userId, totalUnread);
+                    return totalUnread;
+                }
+            }
+
+        } catch (SQLException e) {
+            logger.error("查询总未读数量时发生数据库错误: userId={}", userId, e);
+            throw new RuntimeException("查询总未读数量时发生数据库错误", e);
+        }
+
+        return 0;
+    }
+
+    /**
+     * 更新会话状态
+     */
+    public boolean updateStatus(String conversationId, String status) {
+        String sql = "UPDATE conversation SET status = ?, update_time = CURRENT_TIMESTAMP " +
+                    "WHERE conversation_id = ? AND is_deleted = 0";
+
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, status);
+            stmt.setString(2, conversationId);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("更新会话状态成功: conversationId={}, status={}", conversationId, status);
+                return true;
+            } else {
+                logger.warn("更新会话状态失败: 会话不存在或已删除, conversationId={}", conversationId);
+                return false;
+            }
+
+        } catch (SQLException e) {
+            logger.error("更新会话状态时发生数据库错误: conversationId={}, status={}",
+                        conversationId, status, e);
+            throw new RuntimeException("更新会话状态时发生数据库错误", e);
+        }
     }
 }

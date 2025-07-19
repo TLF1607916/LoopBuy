@@ -153,7 +153,16 @@ public class Message {
     public void setRead(Boolean read) {
         this.read = read;
     }
-    
+
+    // 兼容性方法
+    public Boolean getIsRead() {
+        return read;
+    }
+
+    public void setIsRead(Boolean isRead) {
+        this.read = isRead;
+    }
+
     public Boolean getDeleted() {
         return deleted;
     }

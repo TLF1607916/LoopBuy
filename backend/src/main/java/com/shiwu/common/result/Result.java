@@ -67,6 +67,7 @@ public class Result<T> {
     public static <T> Result<T> fail(String errorCode, String errorMessage) {
         Result<T> result = new Result<>();
         result.setSuccess(false);
+        result.setMessage(errorMessage); // 设置message字段
         ErrorInfo errorInfo = new ErrorInfo(errorCode, errorMessage);
         result.setError(errorInfo);
         return result;
@@ -83,6 +84,7 @@ public class Result<T> {
     public static <T> Result<T> fail(String errorCode, String errorMessage, String userTip) {
         Result<T> result = new Result<>();
         result.setSuccess(false);
+        result.setMessage(errorMessage); // 设置message字段
         ErrorInfo errorInfo = new ErrorInfo(errorCode, errorMessage, userTip);
         result.setError(errorInfo);
         return result;
@@ -90,6 +92,11 @@ public class Result<T> {
 
     public Boolean getSuccess() {
         return success;
+    }
+
+    // 兼容性方法
+    public boolean isSuccess() {
+        return success != null && success;
     }
 
     public void setSuccess(Boolean success) {

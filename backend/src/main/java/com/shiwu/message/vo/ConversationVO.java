@@ -18,6 +18,16 @@ public class ConversationVO {
     private String conversationId;
     
     /**
+     * 参与者1 ID
+     */
+    private Long participant1Id;
+
+    /**
+     * 参与者2 ID
+     */
+    private Long participant2Id;
+
+    /**
      * 对方用户ID
      */
     private Long otherPartyId;
@@ -111,7 +121,23 @@ public class ConversationVO {
     public void setOtherPartyId(Long otherPartyId) {
         this.otherPartyId = otherPartyId;
     }
-    
+
+    public Long getParticipant1Id() {
+        return participant1Id;
+    }
+
+    public void setParticipant1Id(Long participant1Id) {
+        this.participant1Id = participant1Id;
+    }
+
+    public Long getParticipant2Id() {
+        return participant2Id;
+    }
+
+    public void setParticipant2Id(Long participant2Id) {
+        this.participant2Id = participant2Id;
+    }
+
     public String getOtherPartyUsername() {
         return otherPartyUsername;
     }
