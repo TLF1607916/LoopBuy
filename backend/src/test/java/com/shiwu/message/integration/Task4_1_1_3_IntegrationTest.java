@@ -49,7 +49,7 @@ class Task4_1_1_3_IntegrationTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        messageService = new MessageServiceImpl(messageDao, conversationDao);
+        messageService = new MessageServiceImpl(messageDao, conversationDao, null, null);
     }
     
     @Test

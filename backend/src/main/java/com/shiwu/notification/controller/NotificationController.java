@@ -2,6 +2,7 @@ package com.shiwu.notification.controller;
 
 import com.shiwu.common.result.Result;
 import com.shiwu.common.util.JsonUtil;
+import com.shiwu.common.util.JwtUtil;
 import com.shiwu.notification.service.NotificationService;
 import com.shiwu.notification.service.impl.NotificationServiceImpl;
 import com.shiwu.notification.vo.NotificationVO;
@@ -21,10 +22,16 @@ import java.util.stream.Collectors;
 
 /**
  * 通知控制器
- * 
+ *
  * 用于Task4_2_1_2: 商品审核通过粉丝通知功能
- * 提供通知相关的HTTP API接口
- * 
+ * 用于Task4_3_1_3: 获取通知列表和未读计数的API
+ *
+ * 提供完整的通知相关HTTP API接口：
+ * - GET /api/notification/list - 获取通知列表
+ * - GET /api/notification/unread-count - 获取未读通知数量
+ * - PUT /api/notification/mark-read - 标记单个通知已读
+ * - PUT /api/notification/mark-all-read - 批量标记通知已读
+ *
  * @author LoopBuy Team
  * @version 1.0
  * @since 2024-01-15
@@ -229,18 +236,36 @@ public class NotificationController extends HttpServlet {
     
     /**
      * 从JWT Token中获取当前用户ID
+     * Task4_3_1_3: 完善JWT Token解析逻辑
      */
     private Long getCurrentUserIdFromToken(HttpServletRequest req) {
-        // 这里应该实现JWT Token解析逻辑
-        // 为了简化，暂时从请求头中获取
+        // 优先从Authorization Header中获取JWT Token
+        String authHeader = req.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            try {
+                if (JwtUtil.validateToken(token)) {
+                    return JwtUtil.getUserIdFromToken(token);
+                } else {
+                    logger.warn("JWT Token验证失败");
+                }
+            } catch (Exception e) {
+                logger.warn("JWT Token解析失败: {}", e.getMessage());
+            }
+        }
+
+        // 兼容性支持：从X-User-Id Header中获取（用于测试）
         String userIdHeader = req.getHeader("X-User-Id");
         if (userIdHeader != null) {
             try {
-                return Long.parseLong(userIdHeader);
+                Long userId = Long.parseLong(userIdHeader);
+                logger.debug("使用X-User-Id Header获取用户ID: {}", userId);
+                return userId;
             } catch (NumberFormatException e) {
                 logger.warn("用户ID格式错误: {}", userIdHeader);
             }
         }
+
         return null;
     }
     

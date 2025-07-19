@@ -1,7 +1,11 @@
 package com.shiwu.order.service.impl;
 
 import com.shiwu.cart.dao.CartDao;
+import com.shiwu.common.result.Result;
 import com.shiwu.common.util.JsonUtil;
+import com.shiwu.notification.model.Notification;
+import com.shiwu.notification.service.NotificationService;
+import com.shiwu.notification.service.impl.NotificationServiceImpl;
 import com.shiwu.order.dao.OrderDao;
 import com.shiwu.order.model.*;
 import com.shiwu.order.service.OrderService;
@@ -17,18 +21,22 @@ import java.util.Map;
 
 /**
  * 订单服务实现类
+ *
+ * Task4_3_1_2: 在订单状态变更时创建通知
  */
 public class OrderServiceImpl implements OrderService {
     private static final Logger logger = LoggerFactory.getLogger(OrderServiceImpl.class);
-    
+
     private final OrderDao orderDao;
     private final ProductDao productDao;
     private final CartDao cartDao;
-    
+    private final NotificationService notificationService;
+
     public OrderServiceImpl() {
         this.orderDao = new OrderDao();
         this.productDao = new ProductDao();
         this.cartDao = new CartDao();
+        this.notificationService = new NotificationServiceImpl();
     }
     
     @Override
@@ -254,7 +262,10 @@ public class OrderServiceImpl implements OrderService {
                 logger.error("更新订单状态失败: 数据库操作失败, orderId={}, status={}", orderId, status);
                 return OrderOperationResult.failure(OrderErrorCode.UPDATE_ORDER_STATUS_FAILED, OrderErrorCode.MSG_UPDATE_ORDER_STATUS_FAILED);
             }
-            
+
+            // Task4_3_1_2: 创建订单状态变更通知
+            createOrderStatusNotification(order, status, userId);
+
             logger.info("更新订单状态成功: orderId={}, status={}, userId={}", orderId, status, userId);
             return OrderOperationResult.success(null);
             
@@ -586,4 +597,65 @@ public class OrderServiceImpl implements OrderService {
             return OrderOperationResult.failure(OrderErrorCode.SYSTEM_ERROR, OrderErrorCode.MSG_SYSTEM_ERROR);
         }
     }
+
+    /**
+     * Task4_3_1_2: 创建订单状态变更通知
+     * 当订单状态发生变更时，为买家和卖家创建相应的通知
+     */
+    private void createOrderStatusNotification(Order order, Integer newStatus, Long operatorUserId) {
+        try {
+            // 检查通知服务是否可用（测试环境可能为null）
+            if (notificationService == null) {
+                logger.debug("通知服务不可用，跳过通知创建: orderId={}", order.getId());
+                return;
+            }
+
+            String statusText = getOrderStatusText(newStatus);
+            String title = "订单状态更新";
+            String content = "您的订单 #" + order.getId() + " 状态已更新为：" + statusText;
+
+            // 确定通知接收者（非操作者）
+            Long recipientId = null;
+            if (operatorUserId.equals(order.getBuyerId())) {
+                // 买家操作，通知卖家
+                recipientId = order.getSellerId();
+                content = "买家已将订单 #" + order.getId() + " 状态更新为：" + statusText;
+            } else if (operatorUserId.equals(order.getSellerId())) {
+                // 卖家操作，通知买家
+                recipientId = order.getBuyerId();
+                content = "卖家已将订单 #" + order.getId() + " 状态更新为：" + statusText;
+            }
+
+            if (recipientId != null) {
+                Notification notification = new Notification();
+                notification.setRecipientId(recipientId);
+                notification.setTitle(title);
+                notification.setContent(content);
+                notification.setNotificationType(Notification.TYPE_ORDER_STATUS);
+                notification.setSourceType(Notification.SOURCE_ORDER);
+                notification.setSourceId(order.getId());
+                notification.setRelatedUserId(operatorUserId);
+                notification.setActionUrl("/order/" + order.getId());
+                notification.setPriority(Notification.PRIORITY_NORMAL);
+                notification.setExpireAfterHours(168); // 7天过期
+
+                Result<Long> result = notificationService.createNotification(notification);
+
+                if (result.isSuccess()) {
+                    logger.info("创建订单状态变更通知成功: orderId={}, notificationId={}, recipientId={}",
+                               order.getId(), result.getData(), recipientId);
+                } else {
+                    logger.warn("创建订单状态变更通知失败: orderId={}, recipientId={}, error={}",
+                               order.getId(), recipientId, result.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            // 通知创建失败不影响订单状态更新的主流程
+            logger.error("创建订单状态变更通知时发生异常: orderId={}, newStatus={}, error={}",
+                        order.getId(), newStatus, e.getMessage(), e);
+        }
+    }
+
+
 }

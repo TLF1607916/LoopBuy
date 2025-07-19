@@ -9,6 +9,10 @@ import com.shiwu.message.model.Message;
 import com.shiwu.message.service.MessageService;
 import com.shiwu.message.vo.ConversationVO;
 import com.shiwu.message.vo.MessageVO;
+import com.shiwu.notification.service.NotificationService;
+import com.shiwu.notification.service.impl.NotificationServiceImpl;
+import com.shiwu.user.dao.UserDao;
+import com.shiwu.user.model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,29 +22,38 @@ import java.util.List;
 
 /**
  * 消息服务实现类
- * 
+ *
  * 实现实时消息收发、会话管理等功能
  * 支持基于轮询的实时消息推送
- * 
+ *
+ * Task4_3_1_2: 在消息发送时创建通知
+ *
  * @author LoopBuy Team
  * @version 1.0
  */
 public class MessageServiceImpl implements MessageService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(MessageServiceImpl.class);
-    
+
     private final MessageDao messageDao;
     private final ConversationDao conversationDao;
-    
+    private final NotificationService notificationService;
+    private final UserDao userDao;
+
     public MessageServiceImpl() {
         this.messageDao = new MessageDao();
         this.conversationDao = new ConversationDao();
+        this.notificationService = new NotificationServiceImpl();
+        this.userDao = new UserDao();
     }
-    
+
     // 用于测试的构造函数
-    public MessageServiceImpl(MessageDao messageDao, ConversationDao conversationDao) {
+    public MessageServiceImpl(MessageDao messageDao, ConversationDao conversationDao,
+                            NotificationService notificationService, UserDao userDao) {
         this.messageDao = messageDao;
         this.conversationDao = conversationDao;
+        this.notificationService = notificationService;
+        this.userDao = userDao;
     }
     
     @Override
@@ -98,13 +111,16 @@ public class MessageServiceImpl implements MessageService {
             
             // 更新会话信息
             updateConversationAfterMessage(conversation, message, senderId);
-            
+
+            // Task4_3_1_2: 创建消息通知
+            createMessageNotification(message);
+
             // 转换为VO
             MessageVO messageVO = convertToMessageVO(message);
-            
-            logger.info("消息发送成功: messageId={}, senderId={}, receiverId={}", 
+
+            logger.info("消息发送成功: messageId={}, senderId={}, receiverId={}",
                        messageId, senderId, dto.getReceiverId());
-            
+
             return Result.success(messageVO);
             
         } catch (Exception e) {
@@ -478,5 +494,48 @@ public class MessageServiceImpl implements MessageService {
      */
     private boolean isValidStatus(String status) {
         return "ACTIVE".equals(status) || "ARCHIVED".equals(status) || "BLOCKED".equals(status);
+    }
+
+    /**
+     * Task4_3_1_2: 创建消息通知
+     * 当用户收到新消息时，为接收者创建通知
+     */
+    private void createMessageNotification(Message message) {
+        try {
+            // 检查依赖服务是否可用（测试环境可能为null）
+            if (notificationService == null || userDao == null) {
+                logger.debug("通知服务或用户DAO不可用，跳过通知创建: messageId={}", message.getId());
+                return;
+            }
+
+            // 获取发送者信息
+            User sender = userDao.findPublicInfoById(message.getSenderId());
+            if (sender == null) {
+                logger.warn("创建消息通知失败: 发送者不存在, senderId={}", message.getSenderId());
+                return;
+            }
+
+            // 创建通知
+            Result<Long> result = notificationService.createMessageNotification(
+                message.getReceiverId(),
+                message.getSenderId(),
+                sender.getNickname() != null ? sender.getNickname() : sender.getUsername(),
+                message.getContent(),
+                message.getConversationId()
+            );
+
+            if (result.isSuccess()) {
+                logger.info("创建消息通知成功: messageId={}, notificationId={}, receiverId={}",
+                           message.getId(), result.getData(), message.getReceiverId());
+            } else {
+                logger.warn("创建消息通知失败: messageId={}, receiverId={}, error={}",
+                           message.getId(), message.getReceiverId(), result.getMessage());
+            }
+
+        } catch (Exception e) {
+            // 通知创建失败不影响消息发送的主流程
+            logger.error("创建消息通知时发生异常: messageId={}, receiverId={}, error={}",
+                        message.getId(), message.getReceiverId(), e.getMessage(), e);
+        }
     }
 }
