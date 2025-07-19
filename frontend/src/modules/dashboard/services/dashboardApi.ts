@@ -1,4 +1,4 @@
-import api from './api';
+import api from '../../../shared/services/baseApi';
 import { DashboardResponse, DashboardData } from '../types/dashboard';
 
 // 仪表盘API服务类

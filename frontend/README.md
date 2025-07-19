@@ -32,39 +32,40 @@
 
 ## 项目结构
 
+采用模块化架构，按功能模块组织代码：
+
 ```
 src/
-├── components/          # 可复用组件
-│   ├── charts/         # 图表组件
-│   │   ├── BaseChart.tsx
-│   │   ├── LineChart.tsx
-│   │   ├── PieChart.tsx
-│   │   ├── BarChart.tsx
-│   │   └── charts.css
-│   ├── dashboard/      # 仪表盘组件
-│   │   ├── DashboardLayout.tsx
-│   │   ├── DashboardLayout.css
-│   │   ├── StatCard.tsx
-│   │   └── StatCard.css
-│   └── ProtectedRoute.tsx
-├── contexts/           # React上下文
-│   └── AuthContext.tsx
-├── pages/              # 页面组件
-│   ├── LoginPage.tsx
-│   ├── LoginPage.css
-│   ├── DashboardPage.tsx
-│   └── DashboardPage.css
-├── services/           # API服务
-│   ├── api.ts
-│   └── dashboardApi.ts
-├── types/              # TypeScript类型定义
-│   ├── auth.ts
-│   └── dashboard.ts
-├── App.tsx
-├── App.css
-├── main.tsx
-└── index.css
+├── modules/                     # 功能模块目录
+│   ├── auth/                   # 认证模块 (Task5_1_1_3)
+│   │   ├── components/         # 认证相关组件
+│   │   ├── contexts/           # 认证上下文
+│   │   ├── pages/              # 认证页面
+│   │   ├── services/           # 认证API服务
+│   │   ├── types/              # 认证类型定义
+│   │   └── index.ts            # 模块导出
+│   └── dashboard/              # 仪表盘模块 (Task5_1_2_2)
+│       ├── components/         # 仪表盘组件
+│       │   ├── charts/         # 图表组件
+│       │   ├── layout/         # 布局组件
+│       │   └── cards/          # 卡片组件
+│       ├── pages/              # 仪表盘页面
+│       ├── services/           # 仪表盘API服务
+│       ├── types/              # 仪表盘类型定义
+│       └── index.ts            # 模块导出
+├── shared/                     # 共享模块
+│   ├── services/               # 共享服务
+│   ├── types/                  # 共享类型
+│   ├── utils/                  # 工具函数
+│   ├── constants/              # 常量定义
+│   └── index.ts                # 共享模块导出
+├── App.tsx                     # 主应用组件
+├── App.css                     # 主应用样式
+├── main.tsx                    # 应用入口
+└── index.css                   # 全局样式
 ```
+
+详细的模块架构说明请参考 [MODULE_STRUCTURE.md](./MODULE_STRUCTURE.md)
 
 ## 安装和运行
 

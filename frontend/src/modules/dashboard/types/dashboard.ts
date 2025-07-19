@@ -1,4 +1,4 @@
-// 仪表盘统计数据类型定义
+// 仪表盘数据类型定义
 
 // 核心统计指标
 export interface DashboardStats {

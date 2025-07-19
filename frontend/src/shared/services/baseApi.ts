@@ -1,5 +1,4 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { AdminLoginRequest, AdminLoginResponse } from '../types/auth';
 
 // 创建axios实例
 const api: AxiosInstance = axios.create({
@@ -42,27 +41,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-// 管理员登录API
-export const adminLogin = async (loginData: AdminLoginRequest): Promise<AdminLoginResponse> => {
-  try {
-    const response = await api.post<AdminLoginResponse>('/admin/login', loginData);
-    return response.data;
-  } catch (error: any) {
-    // 处理网络错误或服务器错误
-    if (error.response?.data) {
-      return error.response.data;
-    } else {
-      return {
-        success: false,
-        error: {
-          code: 'NETWORK_ERROR',
-          message: '网络连接失败',
-          userTip: '请检查网络连接后重试'
-        }
-      };
-    }
-  }
-};
 
 export default api;

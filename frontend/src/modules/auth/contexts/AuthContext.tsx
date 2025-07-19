@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AdminVO, AuthContextType } from '../types/auth';
-import { adminLogin } from '../services/api';
+import authApi from '../services/authApi';
 
 // 创建认证上下文
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
 
     try {
-      const response = await adminLogin({ username, password });
+      const response = await authApi.adminLogin({ username, password });
       
       if (response.success && response.data) {
         // 登录成功，保存用户信息和token
@@ -62,11 +62,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // 登出函数
-  const logout = () => {
+  const logout = async () => {
     setAdmin(null);
     setError(null);
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_info');
+    await authApi.adminLogout();
   };
 
   const value: AuthContextType = {
