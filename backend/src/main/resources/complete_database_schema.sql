@@ -248,6 +248,31 @@ CREATE TABLE IF NOT EXISTS audit_log (
     FOREIGN KEY (admin_id) REFERENCES administrator(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='审计日志表';
 
+
+-- 创建评价表
+CREATE TABLE IF NOT EXISTS review (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '评价ID',
+    order_id BIGINT UNSIGNED NOT NULL UNIQUE COMMENT '关联订单ID（唯一，一个订单只能评价一次）',
+    product_id BIGINT UNSIGNED NOT NULL COMMENT '关联商品ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '评价用户ID（买家）',
+    rating TINYINT NOT NULL COMMENT '评分（1-5星）',
+    comment VARCHAR(500) COMMENT '评价内容',
+    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除：0-未删除，1-已删除',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    INDEX idx_order_id (order_id),
+    INDEX idx_product_id (product_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_rating (rating),
+    INDEX idx_create_time (create_time),
+
+    FOREIGN KEY (order_id) REFERENCES trade_order(id),
+    FOREIGN KEY (product_id) REFERENCES product(id),
+    FOREIGN KEY (user_id) REFERENCES system_user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评价表';
+
+
 -- ====================================================================
 -- 5. 消息/会话相关表 (Task4_1_1_1)
 -- ====================================================================
