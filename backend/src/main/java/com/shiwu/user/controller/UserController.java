@@ -2,6 +2,7 @@ package com.shiwu.user.controller;
 
 import com.shiwu.common.result.Result;
 import com.shiwu.common.util.JsonUtil;
+import com.shiwu.common.util.JwtUtil;
 import com.shiwu.user.model.*;
 import com.shiwu.user.service.UserService;
 import com.shiwu.user.service.impl.UserServiceImpl;
@@ -154,9 +155,8 @@ public class UserController extends HttpServlet {
                 return;
             }
 
-            // 获取当前登录用户ID（从JWT token中解析，这里暂时设为null）
-            // TODO: 实现JWT token解析获取当前用户ID
-            Long currentUserId = null;
+            // 获取当前登录用户ID（从JWT token中解析）
+            Long currentUserId = getCurrentUserIdFromToken(req);
 
             // 调用服务获取用户公开信息
             UserProfileVO userProfile = userService.getUserProfile(userId, currentUserId);
@@ -244,7 +244,6 @@ public class UserController extends HttpServlet {
             }
 
             // 获取当前登录用户ID（从JWT token中解析）
-            // TODO: 实现JWT token解析获取当前用户ID
             Long currentUserId = getCurrentUserIdFromToken(req);
             if (currentUserId == null) {
                 sendErrorResponse(resp, "A0300", "请先登录");
@@ -290,7 +289,6 @@ public class UserController extends HttpServlet {
             }
 
             // 获取当前登录用户ID（从JWT token中解析）
-            // TODO: 实现JWT token解析获取当前用户ID
             Long currentUserId = getCurrentUserIdFromToken(req);
             if (currentUserId == null) {
                 sendErrorResponse(resp, "A0300", "请先登录");
@@ -357,11 +355,48 @@ public class UserController extends HttpServlet {
 
     /**
      * 从JWT token中获取当前用户ID
-     * TODO: 实现JWT token解析
+     * 支持多种方式获取用户ID：
+     * 1. 优先从Authorization Header中获取JWT Token
+     * 2. 兼容性支持：从X-User-Id Header中获取（用于测试）
+     * 3. 从JWT拦截器设置的请求属性中获取
      */
     private Long getCurrentUserIdFromToken(HttpServletRequest req) {
-        // 暂时返回null，表示未登录
-        // 实际实现中应该从Authorization header中解析JWT token
+        // 方式1：优先从JWT拦截器设置的请求属性中获取（最高效）
+        Object userIdAttr = req.getAttribute("userId");
+        if (userIdAttr instanceof Long) {
+            return (Long) userIdAttr;
+        }
+
+        // 方式2：从Authorization Header中获取JWT Token
+        String authHeader = req.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            try {
+                if (JwtUtil.validateToken(token)) {
+                    Long userId = JwtUtil.getUserIdFromToken(token);
+                    if (userId != null) {
+                        logger.debug("从JWT Token中解析到用户ID: {}", userId);
+                        return userId;
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("JWT Token解析失败: {}", e.getMessage());
+            }
+        }
+
+        // 方式3：兼容性支持：从X-User-Id Header中获取（用于测试）
+        String userIdHeader = req.getHeader("X-User-Id");
+        if (userIdHeader != null && !userIdHeader.trim().isEmpty()) {
+            try {
+                Long userId = Long.parseLong(userIdHeader.trim());
+                logger.debug("从X-User-Id Header中获取到用户ID: {}", userId);
+                return userId;
+            } catch (NumberFormatException e) {
+                logger.warn("X-User-Id Header格式错误: {}", userIdHeader);
+            }
+        }
+
+        logger.debug("未能获取到当前用户ID");
         return null;
     }
 

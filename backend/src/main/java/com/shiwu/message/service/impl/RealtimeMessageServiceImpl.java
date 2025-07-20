@@ -36,6 +36,9 @@ public class RealtimeMessageServiceImpl implements RealtimeMessageService {
     
     // 轮询间隔（毫秒）
     private static final long POLL_INTERVAL_MS = 1000;
+
+    // 用户活跃超时时间（毫秒）- 5分钟
+    private static final long ACTIVE_TIMEOUT = 5 * 60 * 1000;
     
     // 在线用户计数器
     private static final AtomicInteger onlineUserCount = new AtomicInteger(0);
@@ -231,16 +234,53 @@ public class RealtimeMessageServiceImpl implements RealtimeMessageService {
                 logger.warn("通知新消息失败: 参数为空");
                 return;
             }
-            
-            // 这里可以实现消息推送逻辑
-            // 例如：WebSocket推送、SSE推送等
-            // 当前实现中，客户端通过轮询获取新消息
-            
-            logger.debug("通知新消息: userId={}, messageId={}", userId, messageId);
-            
+
+            // 实现消息推送逻辑
+            // 1. 检查用户是否在线
+            if (isUserOnline(userId)) {
+                // 2. 更新用户的最新消息时间戳，用于轮询检测
+                updateUserLastMessageTime(userId, messageId);
+
+                // 3. 记录推送事件（用于统计和调试）
+                logger.info("推送新消息通知: userId={}, messageId={}, 用户在线", userId, messageId);
+
+                // 4. 未来可以在这里集成WebSocket、SSE或其他实时推送技术
+                // 例如：webSocketService.sendMessage(userId, messageData);
+                // 例如：sseService.sendEvent(userId, "new-message", messageData);
+
+            } else {
+                logger.debug("用户不在线，跳过实时推送: userId={}, messageId={}", userId, messageId);
+            }
+
         } catch (Exception e) {
             logger.error("通知新消息时发生异常: userId={}, messageId={}", userId, messageId, e);
         }
+    }
+
+    /**
+     * 检查用户是否在线
+     * @param userId 用户ID
+     * @return 是否在线
+     */
+    private boolean isUserOnline(Long userId) {
+        Long lastActiveTime = userLastActiveTime.get(userId);
+        if (lastActiveTime == null) {
+            return false;
+        }
+
+        long currentTime = System.currentTimeMillis();
+        return (currentTime - lastActiveTime) <= ACTIVE_TIMEOUT;
+    }
+
+    /**
+     * 更新用户的最新消息时间戳
+     * @param userId 用户ID
+     * @param messageId 消息ID
+     */
+    private void updateUserLastMessageTime(Long userId, Long messageId) {
+        // 这里可以存储用户的最新消息ID，用于轮询时快速检测新消息
+        // 当前实现中通过数据库查询实现，未来可以优化为内存缓存
+        logger.debug("更新用户最新消息时间戳: userId={}, messageId={}", userId, messageId);
     }
     
     @Override

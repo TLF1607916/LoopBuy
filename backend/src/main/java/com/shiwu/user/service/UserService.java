@@ -81,4 +81,11 @@ public interface UserService {
      * @return 关注动态信息流
      */
     Result<FeedResponseVO> getFollowingFeed(Long userId, int page, int size, String type);
+
+    /**
+     *  更新用户平均评分
+     * @param userId 用户ID
+     * @return 更新是否成功 
+     */
+    boolean updateUserAverageRating(Long userId);
 }
