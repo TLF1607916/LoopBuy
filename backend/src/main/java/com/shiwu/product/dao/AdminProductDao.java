@@ -22,6 +22,12 @@ public class AdminProductDao {
      * 查询商品列表（管理员视角）
      */
     public List<Map<String, Object>> findProducts(AdminProductQueryDTO queryDTO) {
+        // 参数验证
+        if (queryDTO == null) {
+            logger.warn("查询商品列表失败: 查询条件为空");
+            throw new IllegalArgumentException("查询条件不能为空");
+        }
+
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT p.id, p.title, p.price, p.status, p.create_time, p.update_time, ");
         sql.append("p.seller_id, u.username as seller_name, p.category_id ");
@@ -104,6 +110,12 @@ public class AdminProductDao {
      * 统计商品数量
      */
     public int countProducts(AdminProductQueryDTO queryDTO) {
+        // 参数验证
+        if (queryDTO == null) {
+            logger.warn("统计商品数量失败: 查询条件为空");
+            throw new IllegalArgumentException("查询条件不能为空");
+        }
+
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT COUNT(*) FROM product p ");
         sql.append("WHERE p.is_deleted = 0 ");
@@ -163,6 +175,20 @@ public class AdminProductDao {
      * 更新商品状态（管理员操作）
      */
     public boolean updateProductStatus(Long productId, Integer status, Long adminId) {
+        // 参数验证
+        if (productId == null) {
+            logger.warn("更新商品状态失败: 商品ID为空");
+            return false;
+        }
+        if (status == null) {
+            logger.warn("更新商品状态失败: 状态为空");
+            return false;
+        }
+        if (productId <= 0) {
+            logger.warn("更新商品状态失败: 商品ID无效: {}", productId);
+            return false;
+        }
+
         String sql = "UPDATE product SET status = ?, update_time = ? WHERE id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -196,6 +222,16 @@ public class AdminProductDao {
      * 删除商品（软删除）
      */
     public boolean deleteProduct(Long productId, Long adminId) {
+        // 参数验证
+        if (productId == null) {
+            logger.warn("删除商品失败: 商品ID为空");
+            return false;
+        }
+        if (productId <= 0) {
+            logger.warn("删除商品失败: 商品ID无效: {}", productId);
+            return false;
+        }
+
         String sql = "UPDATE product SET is_deleted = 1, update_time = ? WHERE id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;

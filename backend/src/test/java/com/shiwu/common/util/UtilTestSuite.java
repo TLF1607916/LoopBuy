@@ -81,9 +81,14 @@ public class UtilTestSuite {
         assertNull(JwtUtil.getUsernameFromToken("invalid"), "无效token应该返回null");
         assertNull(JwtUtil.getRoleFromToken("invalid"), "无效token应该返回null");
         
-        // 测试null参数
-        assertNull(JwtUtil.generateToken(null, username), "null用户ID应该返回null");
-        assertNull(JwtUtil.generateToken(userId, null), "null用户名应该返回null");
+        // 测试null参数 - 两参数版本应该抛出异常
+        assertThrows(IllegalArgumentException.class, () -> {
+            JwtUtil.generateToken(null, username);
+        }, "null用户ID应该抛出异常");
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            JwtUtil.generateToken(userId, null);
+        }, "null用户名应该抛出异常");
     }
 
     @Test
@@ -121,12 +126,14 @@ public class UtilTestSuite {
         TestObject specialParsed = JsonUtil.fromJson(specialJson, TestObject.class);
         assertEquals(specialObj.getName(), specialParsed.getName(), "特殊字符应该正确处理");
         
-        // 测试异常情况 - JsonUtil返回null而不是抛出异常
-        TestObject invalidResult = JsonUtil.fromJson("invalid json", TestObject.class);
-        assertNull(invalidResult, "无效JSON应该返回null");
+        // 测试异常情况 - JsonUtil应该抛出异常
+        assertThrows(RuntimeException.class, () -> {
+            JsonUtil.fromJson("invalid json", TestObject.class);
+        }, "无效JSON应该抛出异常");
 
-        TestObject nullResult = JsonUtil.fromJson(null, TestObject.class);
-        assertNull(nullResult, "null JSON应该返回null");
+        assertThrows(IllegalArgumentException.class, () -> {
+            JsonUtil.fromJson(null, TestObject.class);
+        }, "null JSON应该抛出异常");
     }
 
     @Test

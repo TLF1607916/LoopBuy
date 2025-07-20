@@ -15,6 +15,7 @@ public class TestConfig {
     
     // 测试ID常量
     public static final Long TEST_USER_ID = 1L;
+    public static final Long TEST_ADMIN_ID = 1L;
     public static final Long TEST_PRODUCT_ID = 1L;
     public static final Long TEST_ORDER_ID = 1L;
     public static final Long TEST_CATEGORY_ID = 1L;

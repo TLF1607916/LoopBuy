@@ -41,7 +41,12 @@ public class AdminUserDao {
             sql.append("FROM system_user WHERE is_deleted = 0 ");
             
             List<Object> params = new ArrayList<>();
-            
+
+            // 参数验证
+            if (queryDTO == null) {
+                queryDTO = new AdminUserQueryDTO();
+            }
+
             // 添加搜索条件
             if (queryDTO.getKeyword() != null && !queryDTO.getKeyword().trim().isEmpty()) {
                 sql.append("AND (username LIKE ? OR nickname LIKE ? OR email LIKE ?) ");
@@ -60,10 +65,27 @@ public class AdminUserDao {
             // 添加排序
             sql.append("ORDER BY ").append(queryDTO.getSortBy()).append(" ").append(queryDTO.getSortDirection()).append(" ");
             
+            // 参数验证和修正
+            int pageSize = queryDTO.getPageSize();
+            int pageNum = queryDTO.getPageNum();
+            if (pageSize <= 0 || pageSize > 1000) {
+                pageSize = 20;
+            }
+            if (pageNum <= 0) {
+                pageNum = 1;
+            }
+
+            // 防止offset溢出
+            long offset = (long)(pageNum - 1) * pageSize;
+            if (offset < 0 || offset > Integer.MAX_VALUE) {
+                offset = 0;
+                pageNum = 1;
+            }
+
             // 添加分页
             sql.append("LIMIT ? OFFSET ?");
-            params.add(queryDTO.getPageSize());
-            params.add((queryDTO.getPageNum() - 1) * queryDTO.getPageSize());
+            params.add(pageSize);
+            params.add((int)offset);
             
             pstmt = conn.prepareStatement(sql.toString());
             
@@ -122,7 +144,12 @@ public class AdminUserDao {
             sql.append("SELECT COUNT(*) FROM system_user WHERE is_deleted = 0 ");
             
             List<Object> params = new ArrayList<>();
-            
+
+            // 参数验证
+            if (queryDTO == null) {
+                queryDTO = new AdminUserQueryDTO();
+            }
+
             // 添加搜索条件
             if (queryDTO.getKeyword() != null && !queryDTO.getKeyword().trim().isEmpty()) {
                 sql.append("AND (username LIKE ? OR nickname LIKE ? OR email LIKE ?) ");
@@ -166,6 +193,12 @@ public class AdminUserDao {
     public boolean updateUserStatus(Long userId, Integer status, Long adminId) {
         if (userId == null || status == null || adminId == null) {
             logger.warn("更新用户状态失败: 参数为空");
+            return false;
+        }
+
+        // 验证status范围（假设有效范围是0-2）
+        if (status < 0 || status > 2) {
+            logger.warn("更新用户状态失败: 状态值无效: {}", status);
             return false;
         }
 

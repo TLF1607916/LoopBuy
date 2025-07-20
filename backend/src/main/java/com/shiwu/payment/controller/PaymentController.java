@@ -32,6 +32,11 @@ public class PaymentController extends HttpServlet {
         this.paymentService = new PaymentServiceImpl();
     }
 
+    // 用于测试的构造函数
+    public PaymentController(PaymentService paymentService) {
+        this.paymentService = paymentService;
+    }
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String pathInfo = req.getPathInfo();

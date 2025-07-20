@@ -42,6 +42,11 @@ public class ReviewController extends HttpServlet {
         this.reviewService = new ReviewServiceImpl();
     }
 
+    // 用于测试的构造函数
+    public ReviewController(ReviewService reviewService) {
+        this.reviewService = reviewService;
+    }
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String pathInfo = req.getPathInfo();

@@ -170,20 +170,25 @@ public class ConversationDao {
      * 更新会话的最后消息信息
      */
     public boolean updateLastMessage(String conversationId, String lastMessage, LocalDateTime lastMessageTime) {
+        // 参数验证
+        if (conversationId == null || lastMessage == null || lastMessageTime == null) {
+            return false;
+        }
+
         String sql = "UPDATE conversation SET last_message = ?, last_message_time = ?, update_time = ? " +
                     "WHERE conversation_id = ? AND is_deleted = 0";
-        
+
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+
             stmt.setString(1, lastMessage);
             stmt.setTimestamp(2, Timestamp.valueOf(lastMessageTime));
             stmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
             stmt.setString(4, conversationId);
-            
+
             int affectedRows = stmt.executeUpdate();
             return affectedRows > 0;
-            
+
         } catch (SQLException e) {
             throw new RuntimeException("更新会话最后消息时发生数据库错误", e);
         }
@@ -193,25 +198,30 @@ public class ConversationDao {
      * 更新会话的未读消息数量
      */
     public boolean updateUnreadCount(String conversationId, Long userId, Integer unreadCount) {
+        // 参数验证
+        if (conversationId == null || userId == null || unreadCount == null) {
+            return false;
+        }
+
         // 根据用户ID确定更新哪个未读计数字段
         String sql = "UPDATE conversation SET update_time = ?, " +
                     "unread_count1 = CASE WHEN participant1_id = ? THEN ? ELSE unread_count1 END, " +
                     "unread_count2 = CASE WHEN participant2_id = ? THEN ? ELSE unread_count2 END " +
                     "WHERE conversation_id = ? AND is_deleted = 0";
-        
+
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+
             stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
             stmt.setLong(2, userId);
             stmt.setInt(3, unreadCount);
             stmt.setLong(4, userId);
             stmt.setInt(5, unreadCount);
             stmt.setString(6, conversationId);
-            
+
             int affectedRows = stmt.executeUpdate();
             return affectedRows > 0;
-            
+
         } catch (SQLException e) {
             throw new RuntimeException("更新会话未读数量时发生数据库错误", e);
         }
@@ -221,22 +231,27 @@ public class ConversationDao {
      * 增加会话的未读消息数量
      */
     public boolean incrementUnreadCount(String conversationId, Long receiverId) {
+        // 参数验证
+        if (conversationId == null || receiverId == null) {
+            return false;
+        }
+
         String sql = "UPDATE conversation SET update_time = ?, " +
                     "unread_count1 = CASE WHEN participant1_id = ? THEN unread_count1 + 1 ELSE unread_count1 END, " +
                     "unread_count2 = CASE WHEN participant2_id = ? THEN unread_count2 + 1 ELSE unread_count2 END " +
                     "WHERE conversation_id = ? AND is_deleted = 0";
-        
+
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+
             stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
             stmt.setLong(2, receiverId);
             stmt.setLong(3, receiverId);
             stmt.setString(4, conversationId);
-            
+
             int affectedRows = stmt.executeUpdate();
             return affectedRows > 0;
-            
+
         } catch (SQLException e) {
             throw new RuntimeException("增加会话未读数量时发生数据库错误", e);
         }

@@ -3,6 +3,7 @@ package com.shiwu.review.dao;
 import com.shiwu.common.test.TestConfig;
 import com.shiwu.review.model.Review;
 import com.shiwu.review.model.ReviewVO;
+import com.shiwu.test.TestBase;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -19,13 +20,14 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("ReviewDao完整测试套件")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Execution(ExecutionMode.CONCURRENT)
-public class ReviewDaoComprehensiveTest {
+public class ReviewDaoComprehensiveTest extends TestBase {
 
     private ReviewDao reviewDao;
     private static final int PERFORMANCE_TEST_ITERATIONS = 50;
 
     @BeforeEach
     public void setUp() {
+        super.setUp(); // 调用父类的setUp方法
         reviewDao = new ReviewDao();
     }
 

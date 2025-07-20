@@ -2,9 +2,12 @@ package com.shiwu.notification.dao;
 
 import com.shiwu.common.test.TestConfig;
 import com.shiwu.notification.model.Notification;
+import com.shiwu.test.TestBase;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -23,8 +26,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("NotificationDao完整测试套件")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Execution(ExecutionMode.CONCURRENT)
-public class NotificationDaoComprehensiveTest {
+public class NotificationDaoComprehensiveTest extends TestBase {
 
+    private static final Logger logger = LoggerFactory.getLogger(NotificationDaoComprehensiveTest.class);
     private NotificationDao notificationDao;
     private static final int PERFORMANCE_TEST_ITERATIONS = 50;
     private static final int CONCURRENT_THREADS = 5;
@@ -59,27 +63,29 @@ public class NotificationDaoComprehensiveTest {
         Long result2 = notificationDao.createNotification(incompleteNotification);
         assertNull(result2, "无recipientId的Notification应该创建失败");
 
-        // 测试完整的Notification对象
+        // 测试完整的Notification对象 - 使用存在的用户ID
         Notification completeNotification = new Notification();
-        completeNotification.setRecipientId(TestConfig.TEST_USER_ID);
+        completeNotification.setRecipientId(TestBase.TEST_USER_ID_1); // 使用TestBase中的有效用户ID
         completeNotification.setTitle("测试通知标题");
         completeNotification.setContent("测试通知内容");
         completeNotification.setNotificationType("PRODUCT_APPROVED");
         completeNotification.setSourceType("PRODUCT");
-        completeNotification.setSourceId(TestConfig.TEST_PRODUCT_ID);
-        completeNotification.setRelatedUserId(TestConfig.TEST_USER_ID + 1);
+        completeNotification.setSourceId(null); // 不设置sourceId，避免外键约束
+        completeNotification.setRelatedUserId(TestBase.TEST_USER_ID_2); // 使用TestBase中的有效用户ID
         completeNotification.setRelatedUserName("测试用户");
         completeNotification.setActionUrl("/product/123");
         completeNotification.setPriority(Notification.PRIORITY_URGENT);
         completeNotification.setExpireTime(LocalDateTime.now().plusDays(7));
-        
+
         try {
             Long result3 = notificationDao.createNotification(completeNotification);
-            // 不管成功与否，都不应该抛出异常
-            assertNotNull(notificationDao, "创建通知后DAO应该正常工作");
+            assertNotNull(result3, "创建通知应该成功");
+            assertTrue(result3 > 0, "通知ID应该大于0");
+            logger.info("创建通知成功: notificationId={}", result3);
         } catch (Exception e) {
-            // 外键约束异常是可接受的
-            assertNotNull(e, "外键约束异常是可接受的");
+            logger.warn("创建通知失败: {}", e.getMessage());
+            // 如果是外键约束问题，记录但不失败测试
+            assertTrue(e.getMessage().contains("foreign key constraint"), "应该是外键约束异常");
         }
     }
 
