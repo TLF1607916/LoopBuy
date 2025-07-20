@@ -9,6 +9,7 @@ import com.shiwu.user.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -129,7 +130,7 @@ public class ReviewServiceImpl implements ReviewService {
     public List<ReviewVO> getReviewsByProductId(Long productId) {
         if (productId == null) {
             logger.warn("获取商品评价列表失败: 商品ID为空");
-            return List.of();
+            return Collections.emptyList();
         }
 
         try {
@@ -138,7 +139,7 @@ public class ReviewServiceImpl implements ReviewService {
             return reviews;
         } catch (Exception e) {
             logger.error("获取商品评价列表失败: productId={}, error={}", productId, e.getMessage(), e);
-            return List.of();
+            return Collections.emptyList();
         }
     }
 
@@ -146,7 +147,7 @@ public class ReviewServiceImpl implements ReviewService {
     public List<ReviewVO> getReviewsByUserId(Long userId) {
         if (userId == null) {
             logger.warn("获取用户评价列表失败: 用户ID为空");
-            return List.of();
+            return Collections.emptyList();
         }
 
         try {
@@ -155,7 +156,7 @@ public class ReviewServiceImpl implements ReviewService {
             return reviews;
         } catch (Exception e) {
             logger.error("获取用户评价列表失败: userId={}, error={}", userId, e.getMessage(), e);
-            return List.of();
+            return Collections.emptyList();
         }
     }
 

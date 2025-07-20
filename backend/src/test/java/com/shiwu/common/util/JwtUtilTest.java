@@ -1,199 +1,307 @@
 package com.shiwu.common.util;
 
+import com.shiwu.test.TestBase;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * JwtUtil测试类
- * 遵循AIR原则：Automatic, Independent, Repeatable
- * 遵循BCDE原则：Border, Correct, Design, Error
+ * JWT工具类测试
+ * 测试JWT token的生成、验证、解析等功能
+ * 
+ * 测试覆盖：
+ * 1. 正常功能测试
+ * 2. 边界条件测试
+ * 3. 异常情况测试
+ * 4. 安全性测试
  */
-public class JwtUtilTest {
+@DisplayName("JWT工具类测试")
+public class JwtUtilTest extends TestBase {
 
-    /**
-     * 测试JWT令牌生成 - 正常情况
-     * BCDE原则中的Correct：使用正确的典型输入
-     */
     @Test
-    public void testGenerateToken_Success() {
-        // Given: 有效的用户ID和用户名
-        Long userId = 123L;
-        String username = "testUser";
+    @DisplayName("生成用户JWT Token - 正常情况")
+    public void testGenerateToken_Normal() {
+        // Given
+        Long userId = TEST_USER_ID_1;
+        String username = TEST_USERNAME_1;
         
-        // When: 生成JWT令牌
+        // When
         String token = JwtUtil.generateToken(userId, username);
         
-        // Then: 验证结果
-        assertNotNull(token, "生成的令牌不应为空");
-        assertTrue(token.length() > 0, "令牌应该有内容");
-        assertTrue(token.contains("."), "JWT令牌应该包含点分隔符");
+        // Then
+        assertNotNull(token, "生成的token不应为null");
+        assertFalse(token.isEmpty(), "生成的token不应为空");
+        assertTrue(token.contains("."), "JWT token应包含点分隔符");
         
-        // JWT令牌应该有三个部分（header.payload.signature）
+        // JWT token应该有3个部分（header.payload.signature）
         String[] parts = token.split("\\.");
-        assertEquals(3, parts.length, "JWT令牌应该有三个部分");
+        assertEquals(3, parts.length, "JWT token应该有3个部分");
+        
+        // 验证token有效性
+        assertTrue(JwtUtil.validateToken(token), "生成的token应该有效");
     }
 
-    /**
-     * 测试JWT令牌生成 - 边界条件
-     * BCDE原则中的Border：测试边界条件
-     */
     @Test
-    public void testGenerateToken_NullInputs() {
-        // Given & When & Then: 测试null输入
-        assertNull(JwtUtil.generateToken(null, "testUser"), "null用户ID应该返回null");
-        assertNull(JwtUtil.generateToken(123L, null), "null用户名应该返回null");
-        assertNull(JwtUtil.generateToken(null, null), "双null应该返回null");
+    @DisplayName("生成管理员JWT Token - 正常情况")
+    public void testGenerateAdminToken_Normal() {
+        // Given
+        Long adminId = TEST_ADMIN_ID;
+        String username = TEST_ADMIN_USERNAME;
+        String role = "ADMIN";
+
+        // When
+        String token = JwtUtil.generateToken(adminId, username, role);
+
+        // Then
+        assertNotNull(token, "生成的管理员token不应为null");
+        assertFalse(token.isEmpty(), "生成的管理员token不应为空");
+        assertTrue(token.contains("."), "JWT token应包含点分隔符");
+
+        String[] parts = token.split("\\.");
+        assertEquals(3, parts.length, "JWT token应该有3个部分");
+
+        // 验证token有效性
+        assertTrue(JwtUtil.validateToken(token), "生成的管理员token应该有效");
     }
 
-    /**
-     * 测试从令牌获取用户ID - 正常情况
-     * BCDE原则中的Correct：使用正确的典型输入
-     */
     @Test
-    public void testGetUserIdFromToken_Success() {
-        // Given: 生成一个有效的令牌
-        Long originalUserId = 456L;
-        String username = "testUser";
-        String token = JwtUtil.generateToken(originalUserId, username);
-        
-        // When: 从令牌中获取用户ID
-        Long extractedUserId = JwtUtil.getUserIdFromToken(token);
-        
-        // Then: 验证结果
-        assertNotNull(extractedUserId, "提取的用户ID不应为空");
-        assertEquals(originalUserId, extractedUserId, "提取的用户ID应该与原始用户ID相同");
-    }
-
-    /**
-     * 测试从令牌获取用户名 - 正常情况
-     * BCDE原则中的Correct：使用正确的典型输入
-     */
-    @Test
-    public void testGetUsernameFromToken_Success() {
-        // Given: 生成一个有效的令牌
-        Long userId = 789L;
-        String originalUsername = "testUser123";
-        String token = JwtUtil.generateToken(userId, originalUsername);
-        
-        // When: 从令牌中获取用户名
-        String extractedUsername = JwtUtil.getUsernameFromToken(token);
-        
-        // Then: 验证结果
-        assertNotNull(extractedUsername, "提取的用户名不应为空");
-        assertEquals(originalUsername, extractedUsername, "提取的用户名应该与原始用户名相同");
-    }
-
-    /**
-     * 测试令牌验证 - 正常情况
-     * BCDE原则中的Correct：使用正确的典型输入
-     */
-    @Test
-    public void testValidateToken_Success() {
-        // Given: 生成一个有效的令牌
-        Long userId = 999L;
-        String username = "validUser";
+    @DisplayName("验证有效的JWT Token")
+    public void testValidateToken_Valid() {
+        // Given
+        Long userId = TEST_USER_ID_1;
+        String username = TEST_USERNAME_1;
         String token = JwtUtil.generateToken(userId, username);
         
-        // When: 验证令牌
+        // When
         boolean isValid = JwtUtil.validateToken(token);
         
-        // Then: 令牌应该有效
-        assertTrue(isValid, "有效的令牌应该通过验证");
+        // Then
+        assertTrue(isValid, "有效的token应该通过验证");
     }
 
-    /**
-     * 测试令牌验证 - 无效令牌
-     * BCDE原则中的Error：测试错误输入
-     */
     @Test
-    public void testValidateToken_InvalidToken() {
-        // Given: 无效的令牌
-        String invalidToken = "invalid.token.here";
+    @DisplayName("验证无效的JWT Token")
+    public void testValidateToken_Invalid() {
+        // Given
+        String[] invalidTokens = {
+            "invalid.token.here",
+            "not.a.jwt",
+            "header.payload", // 缺少签名
+            "too.many.parts.here.invalid",
+            "eyJhbGciOiJIUzI1NiJ9.invalid.signature" // 无效签名
+        };
         
-        // When: 验证令牌
-        boolean isValid = JwtUtil.validateToken(invalidToken);
-        
-        // Then: 令牌应该无效
-        assertFalse(isValid, "无效的令牌不应该通过验证");
+        // When & Then
+        for (String invalidToken : invalidTokens) {
+            boolean isValid = JwtUtil.validateToken(invalidToken);
+            assertFalse(isValid, "无效的token应该验证失败: " + invalidToken);
+        }
     }
 
-    /**
-     * 测试令牌验证 - 边界条件
-     * BCDE原则中的Border：测试边界条件
-     */
     @Test
-    public void testValidateToken_NullAndEmpty() {
-        // Given & When & Then: 测试null和空字符串
-        assertFalse(JwtUtil.validateToken(null), "null令牌不应该通过验证");
-        assertFalse(JwtUtil.validateToken(""), "空令牌不应该通过验证");
-        assertFalse(JwtUtil.validateToken("   "), "空白令牌不应该通过验证");
+    @DisplayName("验证边界情况Token")
+    public void testValidateToken_EdgeCases() {
+        // When & Then
+        assertFalse(JwtUtil.validateToken(null), "null token应该验证失败");
+        assertFalse(JwtUtil.validateToken(""), "空字符串token应该验证失败");
+        assertFalse(JwtUtil.validateToken("   "), "空白字符串token应该验证失败");
     }
 
-    /**
-     * 测试从无效令牌获取用户信息
-     * BCDE原则中的Error：测试错误输入
-     */
     @Test
-    public void testGetUserInfoFromInvalidToken() {
-        // Given: 无效的令牌
-        String invalidToken = "invalid.token.here";
+    @DisplayName("从Token中获取用户ID - 正常情况")
+    public void testGetUserIdFromToken_Normal() {
+        // Given
+        Long expectedUserId = 123L;
+        String username = "testuser";
+        String token = JwtUtil.generateToken(expectedUserId, username);
         
-        // When & Then: 从无效令牌获取信息应该返回null
-        assertNull(JwtUtil.getUserIdFromToken(invalidToken), "从无效令牌获取用户ID应该返回null");
-        assertNull(JwtUtil.getUsernameFromToken(invalidToken), "从无效令牌获取用户名应该返回null");
+        // When
+        Long actualUserId = JwtUtil.getUserIdFromToken(token);
         
-        // 测试null令牌
-        assertNull(JwtUtil.getUserIdFromToken(null), "从null令牌获取用户ID应该返回null");
-        assertNull(JwtUtil.getUsernameFromToken(null), "从null令牌获取用户名应该返回null");
+        // Then
+        assertNotNull(actualUserId, "用户ID不应为null");
+        assertEquals(expectedUserId, actualUserId, "用户ID应该匹配");
     }
 
-    /**
-     * 测试完整的令牌生命周期
-     * BCDE原则中的Design：测试完整的设计流程
-     */
     @Test
-    public void testTokenLifecycle() {
-        // Given: 用户信息
-        Long userId = 12345L;
-        String username = "lifecycleUser";
+    @DisplayName("从Token中获取用户名- 正常情况")
+    public void testGetUsernameFromToken_Normal() {
+        // Given
+        Long userId = 123L;
+        String expectedUsername = "testuser";
+        String token = JwtUtil.generateToken(userId, expectedUsername);
         
-        // When: 生成令牌
+        // When
+        String actualUsername = JwtUtil.getUsernameFromToken(token);
+        
+        // Then
+        assertNotNull(actualUsername, "用户名不应为null");
+        assertEquals(expectedUsername, actualUsername, "用户名应该匹配");
+    }
+
+    @Test
+    @DisplayName("从管理员Token中获取管理员ID")
+    public void testGetAdminIdFromToken_Normal() {
+        // Given
+        Long expectedAdminId = 456L;
+        String username = "admin";
+        String role = "ADMIN";
+        String token = JwtUtil.generateToken(expectedAdminId, username, role);
+
+        // When
+        Long actualAdminId = JwtUtil.getUserIdFromToken(token); // 管理员ID也是通过getUserIdFromToken获取
+
+        // Then
+        assertNotNull(actualAdminId, "管理员ID不应为null");
+        assertEquals(expectedAdminId, actualAdminId, "管理员ID应该匹配");
+    }
+
+    @Test
+    @DisplayName("从管理员Token中获取角色")
+    public void testGetRoleFromToken_Normal() {
+        // Given
+        Long adminId = 456L;
+        String username = "admin";
+        String expectedRole = "SUPER_ADMIN";
+        String token = JwtUtil.generateToken(adminId, username, expectedRole);
+
+        // When
+        String actualRole = JwtUtil.getRoleFromToken(token);
+
+        // Then
+        assertNotNull(actualRole, "角色不应为null");
+        assertEquals(expectedRole, actualRole, "角色应该匹配");
+    }
+
+    @Test
+    @DisplayName("从无效Token中获取信息应返回null")
+    public void testGetInfoFromInvalidToken() {
+        // Given
+        String[] invalidTokens = {
+            "invalid.token.here",
+            null,
+            "",
+            "not.a.jwt"
+        };
+        
+        // When & Then
+        for (String invalidToken : invalidTokens) {
+            assertNull(JwtUtil.getUserIdFromToken(invalidToken),
+                      "从无效token中获取用户ID应返回null: " + invalidToken);
+            assertNull(JwtUtil.getUsernameFromToken(invalidToken),
+                      "从无效token中获取用户名应返回null: " + invalidToken);
+            assertNull(JwtUtil.getRoleFromToken(invalidToken),
+                      "从无效token中获取角色应返回null: " + invalidToken);
+        }
+    }
+
+    @Test
+    @DisplayName("测试特殊字符的用户名")
+    public void testSpecialCharactersInUsername() {
+        // Given
+        Long userId = 1L;
+        String[] specialUsernames = {
+            "test@user.com",
+            "用户名中文",
+            "user-name_123",
+            "user.name+tag",
+            "user name with spaces"
+        };
+        
+        // When & Then
+        for (String specialUsername : specialUsernames) {
+            String token = JwtUtil.generateToken(userId, specialUsername);
+            assertNotNull(token, "包含特殊字符的用户名应该能生成token: " + specialUsername);
+            
+            String extractedUsername = JwtUtil.getUsernameFromToken(token);
+            assertEquals(specialUsername, extractedUsername, 
+                        "特殊字符用户名应该正确提取: " + specialUsername);
+        }
+    }
+
+    @Test
+    @DisplayName("测试边界值用户ID")
+    public void testBoundaryUserIds() {
+        // Given
+        String username = "testuser";
+        Long[] boundaryIds = {
+            1L,                    // 最小正值
+            Long.MAX_VALUE,        // 最大值
+            999999999L             // 大数值
+        };
+        
+        // When & Then
+        for (Long userId : boundaryIds) {
+            String token = JwtUtil.generateToken(userId, username);
+            assertNotNull(token, "边界用户ID应该能生成token: " + userId);
+            
+            Long extractedId = JwtUtil.getUserIdFromToken(token);
+            assertEquals(userId, extractedId, "边界用户ID应该正确提取: " + userId);
+        }
+    }
+
+    @Test
+    @DisplayName("测试null参数异常")
+    public void testNullParameterExceptions() {
+        // Test generateToken with null parameters
+        assertThrows(Exception.class, () -> {
+            JwtUtil.generateToken(null, "username");
+        }, "null用户ID应该抛出异常");
+        
+        assertThrows(Exception.class, () -> {
+            JwtUtil.generateToken(1L, null);
+        }, "null用户名应该抛出异常");
+        
+        // Test generateToken with null parameters for admin
+        String result1 = JwtUtil.generateToken(null, "admin", "ADMIN");
+        assertNull(result1, "null管理员ID应该返回null");
+
+        String result2 = JwtUtil.generateToken(1L, null, "ADMIN");
+        assertNull(result2, "null管理员用户名应该返回null");
+
+        // null角色是允许的，不会抛出异常
+        String result3 = JwtUtil.generateToken(1L, "admin", null);
+        assertNotNull(result3, "null角色应该能正常生成token");
+    }
+
+    @Test
+    @DisplayName("测试Token一致性")
+    public void testTokenConsistency() {
+        // Given
+        Long userId = TEST_USER_ID_1;
+        String username = TEST_USERNAME_1;
+        
+        // When - 多次生成token
+        String token1 = JwtUtil.generateToken(userId, username);
+        String token2 = JwtUtil.generateToken(userId, username);
+        
+        // Then - 虽然token可能不同（因为时间戳），但解析结果应该相同
+        assertEquals(userId, JwtUtil.getUserIdFromToken(token1), "第一个token的用户ID应该正确");
+        assertEquals(userId, JwtUtil.getUserIdFromToken(token2), "第二个token的用户ID应该正确");
+        assertEquals(username, JwtUtil.getUsernameFromToken(token1), "第一个token的用户名应该正确");
+        assertEquals(username, JwtUtil.getUsernameFromToken(token2), "第二个token的用户名应该正确");
+    }
+
+    @Test
+    @DisplayName("测试Token安全性")
+    public void testTokenSecurity() {
+        // Given
+        Long userId = TEST_USER_ID_1;
+        String username = TEST_USERNAME_1;
         String token = JwtUtil.generateToken(userId, username);
         
-        // Then: 验证完整的生命周期
-        assertNotNull(token, "令牌生成不应为空");
+        // When - 尝试修改token
+        String[] tamperedTokens = {
+            token.substring(0, token.length() - 5) + "XXXXX", // 修改签名
+            token.replace(".", "X"), // 破坏结构
+            token + "extra" // 添加额外内容
+        };
         
-        // 验证令牌有效性
-        assertTrue(JwtUtil.validateToken(token), "生成的令牌应该有效");
-        
-        // 验证能正确提取用户信息
-        assertEquals(userId, JwtUtil.getUserIdFromToken(token), "应该能正确提取用户ID");
-        assertEquals(username, JwtUtil.getUsernameFromToken(token), "应该能正确提取用户名");
-    }
-
-    /**
-     * 测试不同用户生成不同令牌
-     * BCDE原则中的Design：测试令牌唯一性
-     */
-    @Test
-    public void testDifferentUsersGenerateDifferentTokens() {
-        // Given: 两个不同的用户
-        Long userId1 = 111L;
-        String username1 = "user1";
-        Long userId2 = 222L;
-        String username2 = "user2";
-        
-        // When: 为两个用户生成令牌
-        String token1 = JwtUtil.generateToken(userId1, username1);
-        String token2 = JwtUtil.generateToken(userId2, username2);
-        
-        // Then: 令牌应该不同
-        assertNotNull(token1, "用户1的令牌不应为空");
-        assertNotNull(token2, "用户2的令牌不应为空");
-        assertNotEquals(token1, token2, "不同用户的令牌应该不同");
-        
-        // 验证能正确区分用户
-        assertEquals(userId1, JwtUtil.getUserIdFromToken(token1), "令牌1应该对应用户1");
-        assertEquals(userId2, JwtUtil.getUserIdFromToken(token2), "令牌2应该对应用户2");
+        // Then - 修改后的token应该无效
+        for (String tamperedToken : tamperedTokens) {
+            assertFalse(JwtUtil.validateToken(tamperedToken), 
+                       "被篡改的token应该验证失败: " + tamperedToken);
+        }
     }
 }

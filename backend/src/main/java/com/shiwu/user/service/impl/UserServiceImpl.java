@@ -4,6 +4,9 @@ import com.shiwu.common.result.Result;
 import com.shiwu.common.util.JwtUtil;
 import com.shiwu.common.util.PasswordUtil;
 import com.shiwu.user.dao.FeedDao;
+import com.shiwu.product.model.ProductCardVO;
+import com.shiwu.product.service.ProductService;
+import com.shiwu.product.service.impl.ProductServiceImpl;
 import com.shiwu.user.dao.UserDao;
 import com.shiwu.user.dao.UserFollowDao;
 import com.shiwu.user.model.*;
@@ -14,6 +17,7 @@ import com.shiwu.user.vo.PaginationVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -28,11 +32,13 @@ public class UserServiceImpl implements UserService {
     private final UserDao userDao;
     private final UserFollowDao userFollowDao;
     private final FeedDao feedDao;
+    private final ProductService productService;
 
     public UserServiceImpl() {
         this.userDao = new UserDao();
         this.userFollowDao = new UserFollowDao();
         this.feedDao = new FeedDao();
+        this.productService = new ProductServiceImpl();
     }
 
     @Override
@@ -239,15 +245,17 @@ public class UserServiceImpl implements UserService {
             profileVO.setRegistrationDate(user.getCreateTime());
 
             // 获取在售商品列表
-            // 注意：根据模块解耦原则，这里应该调用ProductService而不是直接调用ProductDao
-            // 但由于产品模块还未实现，暂时返回空列表
-            profileVO.setOnSaleProducts(userDao.findOnSaleProductsByUserId(userId));
+            // 根据模块解耦原则，调用ProductService获取在售商品
+            List<ProductCardVO> onSaleProducts = productService.getProductsBySellerIdAndStatus(userId, 1); // 1表示在售状态
+            profileVO.setOnSaleProducts(onSaleProducts);
 
             // 判断当前用户是否关注了该用户
-            // 注意：这里需要查询user_follow表，但为了遵循模块解耦原则，
-            // 应该有专门的FollowService来处理关注关系
-            // 暂时设置为false
-            profileVO.setIsFollowing(false);
+            boolean isFollowing = false;
+            if (currentUserId != null && !currentUserId.equals(userId)) {
+                // 查询关注关系
+                isFollowing = userFollowDao.isFollowing(currentUserId, userId);
+            }
+            profileVO.setIsFollowing(isFollowing);
 
             logger.info("成功获取用户 {} 的公开信息", userId);
             return profileVO;
@@ -487,16 +495,57 @@ public class UserServiceImpl implements UserService {
             }
 
             logger.info("成功获取关注状态: currentUserId={}, targetUserId={}, isFollowing={}",
-                       currentUserId, targetUserId, statusVO.getIsFollowing());
+                    currentUserId, targetUserId, statusVO.getIsFollowing());
             return statusVO;
 
         } catch (Exception e) {
             logger.error("获取关注状态过程发生异常: currentUserId={}, targetUserId={}, error={}",
-                        currentUserId, targetUserId, e.getMessage(), e);
+                    currentUserId, targetUserId, e.getMessage(), e);
             return null;
         }
     }
+    
+    @Override
+    public boolean updateUserAverageRating(Long userId) {
+        // 参数校验
+        if (userId == null) {
+            logger.warn("更新用户平均评分失败: 用户ID为空");
+            return false;
+        }
 
+        try {
+            // 检查用户是否存在
+            User user = userDao.findById(userId);
+            if (user == null) {
+                logger.warn("更新用户平均评分失败: 用户 {} 不存在", userId);
+                return false;
+            }
+
+            // 计算用户的平均评分
+            BigDecimal averageRating = userDao.calculateUserAverageRating(userId);
+
+            // 如果没有评价，设置为0
+            if (averageRating == null) {
+                averageRating = BigDecimal.ZERO;
+            }
+
+            // 更新用户的平均评分
+            boolean success = userDao.updateAverageRating(userId, averageRating);
+            if (success) {
+                logger.info("更新用户平均评分成功: userId={}, averageRating={}", userId, averageRating);
+                return true;
+            } else {
+                logger.error("更新用户平均评分失败: 数据库操作失败 userId={}", userId);
+                return false;
+            }
+
+        } catch (Exception e) {
+            logger.error("更新用户平均评分过程发生异常: userId={}, error={}", userId, e.getMessage(), e);
+            return false;
+        }
+    }
+
+    
     @Override
     public Result<FeedResponseVO> getFollowingFeed(Long userId, int page, int size, String type) {
         // 参数校验

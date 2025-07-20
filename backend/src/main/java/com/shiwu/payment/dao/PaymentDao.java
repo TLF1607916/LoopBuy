@@ -21,10 +21,28 @@ public class PaymentDao {
      * @return 创建的支付记录ID，失败返回null
      */
     public Long createPayment(Payment payment) {
+        // 参数验证
+        if (payment == null) {
+            logger.warn("创建支付记录失败: payment为null");
+            return null;
+        }
+        if (payment.getPaymentId() == null || payment.getPaymentId().trim().isEmpty()) {
+            logger.warn("创建支付记录失败: paymentId为空");
+            return null;
+        }
+        if (payment.getUserId() == null) {
+            logger.warn("创建支付记录失败: userId为null");
+            return null;
+        }
+        if (payment.getPaymentAmount() == null) {
+            logger.warn("创建支付记录失败: paymentAmount为null");
+            return null;
+        }
+
         String sql = "INSERT INTO payment (payment_id, user_id, order_ids, payment_amount, " +
                     "payment_method, payment_status, expire_time, is_deleted, create_time, update_time) " +
                     "VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -37,9 +55,9 @@ public class PaymentDao {
             pstmt.setLong(2, payment.getUserId());
             pstmt.setString(3, payment.getOrderIds());
             pstmt.setBigDecimal(4, payment.getPaymentAmount());
-            pstmt.setInt(5, payment.getPaymentMethod());
-            pstmt.setInt(6, payment.getPaymentStatus());
-            pstmt.setTimestamp(7, Timestamp.valueOf(payment.getExpireTime()));
+            pstmt.setInt(5, payment.getPaymentMethod() != null ? payment.getPaymentMethod() : 0);
+            pstmt.setInt(6, payment.getPaymentStatus() != null ? payment.getPaymentStatus() : 0);
+            pstmt.setTimestamp(7, payment.getExpireTime() != null ? Timestamp.valueOf(payment.getExpireTime()) : null);
 
             int affectedRows = pstmt.executeUpdate();
             
@@ -122,10 +140,20 @@ public class PaymentDao {
      * @return 是否更新成功
      */
     public boolean updatePaymentStatus(String paymentId, Integer status, String thirdPartyTransactionId, String failureReason) {
+        // 参数验证
+        if (paymentId == null || paymentId.trim().isEmpty()) {
+            logger.warn("更新支付状态失败: paymentId为空");
+            return false;
+        }
+        if (status == null) {
+            logger.warn("更新支付状态失败: status为null");
+            return false;
+        }
+
         String sql = "UPDATE payment SET payment_status = ?, third_party_transaction_id = ?, " +
                     "failure_reason = ?, payment_time = ?, update_time = NOW() " +
                     "WHERE payment_id = ? AND is_deleted = 0";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
 
@@ -135,14 +163,14 @@ public class PaymentDao {
             pstmt.setInt(1, status);
             pstmt.setString(2, thirdPartyTransactionId);
             pstmt.setString(3, failureReason);
-            
+
             // 如果是成功状态，设置支付时间
             if (Payment.STATUS_SUCCESS.equals(status)) {
                 pstmt.setTimestamp(4, new Timestamp(System.currentTimeMillis()));
             } else {
                 pstmt.setTimestamp(4, null);
             }
-            
+
             pstmt.setString(5, paymentId);
 
             int result = pstmt.executeUpdate();
@@ -165,12 +193,18 @@ public class PaymentDao {
      * @return 支付记录列表
      */
     public List<Payment> findPaymentsByUserId(Long userId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("查询用户支付记录失败: userId为null");
+            return new ArrayList<>();
+        }
+
         String sql = "SELECT id, payment_id, user_id, order_ids, payment_amount, payment_method, " +
                     "payment_status, third_party_transaction_id, failure_reason, payment_time, " +
                     "expire_time, is_deleted, create_time, update_time " +
                     "FROM payment WHERE user_id = ? AND is_deleted = 0 " +
                     "ORDER BY create_time DESC";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;

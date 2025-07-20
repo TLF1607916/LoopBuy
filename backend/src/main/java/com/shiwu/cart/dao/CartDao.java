@@ -25,6 +25,24 @@ public class CartDao {
      * @return 是否添加成功
      */
     public boolean addToCart(CartItem cartItem) {
+        // 参数验证
+        if (cartItem == null) {
+            logger.warn("添加商品到购物车失败: cartItem为null");
+            return false;
+        }
+        if (cartItem.getUserId() == null) {
+            logger.warn("添加商品到购物车失败: userId为null");
+            return false;
+        }
+        if (cartItem.getProductId() == null) {
+            logger.warn("添加商品到购物车失败: productId为null");
+            return false;
+        }
+        if (cartItem.getQuantity() == null || cartItem.getQuantity() <= 0) {
+            logger.warn("添加商品到购物车失败: quantity无效: {}", cartItem.getQuantity());
+            return false;
+        }
+
         String sql = "INSERT INTO shopping_cart (user_id, product_id, quantity, is_deleted, create_time, update_time) VALUES (?, ?, ?, 0, NOW(), NOW())";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -37,7 +55,7 @@ public class CartDao {
             pstmt.setInt(3, cartItem.getQuantity());
 
             int result = pstmt.executeUpdate();
-            logger.info("添加商品到购物车成功: userId={}, productId={}, quantity={}", 
+            logger.info("添加商品到购物车成功: userId={}, productId={}, quantity={}",
                        cartItem.getUserId(), cartItem.getProductId(), cartItem.getQuantity());
             return result > 0;
         } catch (SQLException e) {
@@ -55,6 +73,16 @@ public class CartDao {
      * @return 是否已存在
      */
     public boolean existsInCart(Long userId, Long productId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("检查商品是否在购物车中失败: userId为null");
+            return false;
+        }
+        if (productId == null) {
+            logger.warn("检查商品是否在购物车中失败: productId为null");
+            return false;
+        }
+
         String sql = "SELECT COUNT(*) FROM shopping_cart WHERE user_id = ? AND product_id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -84,6 +112,12 @@ public class CartDao {
      * @return 购物车项列表
      */
     public List<CartItemVO> findCartItemsByUserId(Long userId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("获取用户购物车列表失败: userId为null");
+            return new ArrayList<>();
+        }
+
         String sql = "SELECT sc.id, sc.product_id, sc.quantity, " +
                     "p.title, p.price, p.status, p.seller_id, " +
                     "u.nickname as seller_name, " +
@@ -94,7 +128,7 @@ public class CartDao {
                     "LEFT JOIN product_image pi ON p.id = pi.product_id AND pi.is_main = 1 " +
                     "WHERE sc.user_id = ? AND sc.is_deleted = 0 " +
                     "ORDER BY sc.create_time DESC";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -143,6 +177,16 @@ public class CartDao {
      * @return 是否移除成功
      */
     public boolean removeFromCart(Long userId, Long productId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("从购物车移除商品失败: userId为null");
+            return false;
+        }
+        if (productId == null) {
+            logger.warn("从购物车移除商品失败: productId为null");
+            return false;
+        }
+
         String sql = "UPDATE shopping_cart SET is_deleted = 1, update_time = NOW() WHERE user_id = ? AND product_id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -171,7 +215,13 @@ public class CartDao {
      * @return 是否移除成功
      */
     public boolean batchRemoveFromCart(Long userId, List<Long> productIds) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("批量从购物车移除商品失败: userId为null");
+            return false;
+        }
         if (productIds == null || productIds.isEmpty()) {
+            logger.debug("批量从购物车移除商品: productIds为空，直接返回成功");
             return true;
         }
 
@@ -213,6 +263,12 @@ public class CartDao {
      * @return 是否清空成功
      */
     public boolean clearCart(Long userId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("清空用户购物车失败: userId为null");
+            return false;
+        }
+
         String sql = "UPDATE shopping_cart SET is_deleted = 1, update_time = NOW() WHERE user_id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -239,6 +295,12 @@ public class CartDao {
      * @return 商品总数
      */
     public int getCartItemCount(Long userId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("获取购物车商品总数失败: userId为null");
+            return 0;
+        }
+
         String sql = "SELECT COUNT(*) FROM shopping_cart WHERE user_id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;

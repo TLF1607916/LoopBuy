@@ -26,6 +26,16 @@ public class UserDao {
      * @return 用户对象，如果不存在则返回null
      */
     public User findByUsername(String username) {
+        // 参数验证
+        if (username == null) {
+            logger.warn("查询用户失败: 用户名为null");
+            return null;
+        }
+        if (username.trim().isEmpty()) {
+            logger.warn("查询用户失败: 用户名为空字符串");
+            return null;
+        }
+
         String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, follower_count, average_rating, last_login_time, create_time FROM system_user WHERE username = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -70,6 +80,16 @@ public class UserDao {
      * @return 用户对象，如果不存在则返回null
      */
     public User findById(Long userId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("查询用户失败: 用户ID为null");
+            return null;
+        }
+        if (userId <= 0) {
+            logger.warn("查询用户失败: 用户ID无效: {}", userId);
+            return null;
+        }
+
         String sql = "SELECT id, username, password, email, phone, status, avatar_url, nickname, gender, bio, follower_count, average_rating, last_login_time, create_time FROM system_user WHERE id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -236,11 +256,25 @@ public class UserDao {
      * @return 是否更新成功
      */
     public boolean updatePassword(Long userId, String newPassword) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("更新用户密码失败: 用户ID为null");
+            return false;
+        }
+        if (userId <= 0) {
+            logger.warn("更新用户密码失败: 用户ID无效: {}", userId);
+            return false;
+        }
+        if (newPassword == null) {
+            logger.warn("更新用户密码失败: 新密码为null");
+            return false;
+        }
+
         String sql = "UPDATE system_user SET password = ? WHERE id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
         boolean success = false;
-        
+
         try {
             conn = DBUtil.getConnection();
             pstmt = conn.prepareStatement(sql);
@@ -340,10 +374,9 @@ public class UserDao {
      * @return 在售商品列表
      */
     public List<ProductCardVO> findOnSaleProductsByUserId(Long userId) {
-        // 注意：这里暂时返回空列表，因为产品模块还未实现
-        // 当产品模块实现后，应该调用ProductDao的相应方法
         // 根据模块解耦原则，UserDao不应该直接查询product表
-        logger.warn("获取用户在售商品列表功能暂未实现，需要产品模块支持");
+        // 这个方法应该被移除，改为在UserService中调用ProductService
+        logger.warn("UserDao.findOnSaleProductsByUserId方法已废弃，请使用ProductService.getProductsBySellerIdAndStatus方法");
         return new ArrayList<>();
     }
 
@@ -457,6 +490,71 @@ public class UserDao {
         }
 
         return avgRating;
+    }
+    /**
+     * 更新用户平均评分
+     * @param userId 用户ID
+     * @param averageRating 新的平均评分
+     * @return 是否更新成功
+     */
+    public boolean updateAverageRating(Long userId, BigDecimal averageRating) {
+        String sql = "UPDATE system_user SET average_rating = ?, update_time = NOW() WHERE id = ? AND is_deleted = 0";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setBigDecimal(1, averageRating);
+            pstmt.setLong(2, userId);
+
+            int result = pstmt.executeUpdate();
+            if (result > 0) {
+                logger.info("更新用户平均评分成功: userId={}, averageRating={}", userId, averageRating);
+                return true;
+            }
+        } catch (SQLException e) {
+            logger.error("更新用户平均评分失败: userId={}, averageRating={}, error={}", userId, averageRating, e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, null);
+        }
+
+        return false;
+    }
+
+    /**
+     * 计算用户的平均评分（基于所有评价）
+     * @param userId 用户ID
+     * @return 平均评分，如果没有评价则返回null
+     */
+    public BigDecimal calculateUserAverageRating(Long userId) {
+        String sql = "SELECT AVG(r.rating) FROM review r " +
+                    "INNER JOIN trade_order o ON r.order_id = o.id " +
+                    "WHERE o.seller_id = ? AND r.is_deleted = 0 AND o.is_deleted = 0";
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = DBUtil.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setLong(1, userId);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                BigDecimal avgRating = rs.getBigDecimal(1);
+                if (avgRating != null) {
+                    // 保留两位小数
+                    return avgRating.setScale(2, BigDecimal.ROUND_HALF_UP);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("计算用户平均评分失败: userId={}, error={}", userId, e.getMessage(), e);
+        } finally {
+            closeResources(conn, pstmt, rs);
+        }
+
+        return null;
     }
 
     /**
