@@ -42,9 +42,28 @@ public class AdminController extends HttpServlet {
     }
 
     @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String pathInfo = req.getPathInfo();
+
+        if (pathInfo == null) {
+            sendErrorResponse(resp, "404", "请求路径不存在");
+            return;
+        }
+
+        switch (pathInfo) {
+            case "/status":
+                handleHealthCheck(req, resp);
+                break;
+            default:
+                sendErrorResponse(resp, "405", "该端点不支持GET请求");
+                break;
+        }
+    }
+
+    @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String pathInfo = req.getPathInfo();
-        
+
         if (pathInfo == null) {
             sendErrorResponse(resp, "404", "请求路径不存在");
             return;
@@ -59,6 +78,7 @@ public class AdminController extends HttpServlet {
                 break;
             default:
                 sendErrorResponse(resp, "404", "请求路径不存在");
+                break;
         }
     }
 
@@ -236,12 +256,27 @@ public class AdminController extends HttpServlet {
     }
 
     /**
+     * 处理健康检查请求
+     */
+    private void handleHealthCheck(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        Map<String, Object> healthData = new HashMap<>();
+        healthData.put("status", "UP");
+        healthData.put("service", "LoopBuy Admin API");
+        healthData.put("version", "1.0.0");
+        healthData.put("timestamp", System.currentTimeMillis());
+        healthData.put("message", "管理员API服务运行正常");
+
+        sendSuccessResponse(resp, healthData);
+        logger.info("健康检查请求: {}", req.getRemoteAddr());
+    }
+
+    /**
      * 发送成功响应
      */
     private void sendSuccessResponse(HttpServletResponse resp, Object data) throws IOException {
         resp.setStatus(HttpServletResponse.SC_OK);
         resp.setContentType("application/json;charset=UTF-8");
-        
+
         Result<Object> result = Result.success(data);
         resp.getWriter().write(objectMapper.writeValueAsString(result));
     }

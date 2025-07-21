@@ -7,6 +7,7 @@ import com.shiwu.message.dto.MessagePollDTO;
 import com.shiwu.message.model.Message;
 import com.shiwu.message.service.MessageService;
 import com.shiwu.message.service.RealtimeMessageService;
+import com.shiwu.message.service.impl.MessageServiceImpl;
 import com.shiwu.message.vo.MessagePollVO;
 import com.shiwu.message.vo.MessageVO;
 import org.slf4j.Logger;
