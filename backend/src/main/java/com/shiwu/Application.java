@@ -10,16 +10,15 @@ import java.io.File;
 
 /**
  * 应用程序启动类
- * 使用嵌入式Tomcat启动Web应用
  */
 public class Application {
     private static final Logger logger = LoggerFactory.getLogger(Application.class);
-    
+
     public static void main(String[] args) {
         try {
             // 创建Tomcat实例
             Tomcat tomcat = new Tomcat();
-            
+
             // 设置端口
             int port = 8080;
             if (args.length > 0) {
@@ -29,30 +28,46 @@ public class Application {
                     logger.warn("无效的端口号参数，使用默认端口8080");
                 }
             }
-            tomcat.setPort(port);
-            
+
             // 设置工作目录
             String workingDir = System.getProperty("java.io.tmpdir");
             tomcat.setBaseDir(workingDir);
-            
+
+            // 显式创建和配置Connector
+            tomcat.setPort(port);
+            tomcat.getConnector(); // 这会创建默认的HTTP Connector
+
             // 获取webapp目录
             String webappDirLocation = "src/main/webapp/";
             File webappDir = new File(webappDirLocation);
             if (!webappDir.exists()) {
                 webappDir = new File("target/shiwu-marketplace-1.0-SNAPSHOT");
             }
-            
-            // 添加webapp
-            Context context = tomcat.addWebapp("/", webappDir.getAbsolutePath());
+
+            // 创建Context - 使用空字符串作为context path
+            Context context = tomcat.addWebapp("", webappDir.getAbsolutePath());
             context.setParentClassLoader(Application.class.getClassLoader());
-            
+
+            logger.info("✅ 已配置Webapp: {}", webappDir.getAbsolutePath());
+
+            // 手动注册AdminController
+            try {
+                Class<?> adminControllerClass = Class.forName("com.shiwu.admin.controller.AdminController");
+                Object adminController = adminControllerClass.getDeclaredConstructor().newInstance();
+                tomcat.addServlet("", "AdminController", (javax.servlet.Servlet) adminController);
+                context.addServletMappingDecoded("/api/admin/*", "AdminController");
+                logger.info("✅ 已注册AdminController: /api/admin/*");
+            } catch (Exception e) {
+                logger.warn("❌ 注册AdminController失败: {}", e.getMessage());
+            }
+
             // 启动Tomcat
             logger.info("正在启动Shiwu校园二手交易平台...");
             logger.info("端口: {}", port);
             logger.info("Webapp目录: {}", webappDir.getAbsolutePath());
-            
+
             tomcat.start();
-            
+
             logger.info("🎉 Shiwu校园二手交易平台启动成功！");
             logger.info("🌐 访问地址: http://localhost:{}", port);
             logger.info("📋 API文档: http://localhost:{}/api/", port);
@@ -61,10 +76,10 @@ public class Application {
             logger.info("🛍️ 商品API: http://localhost:{}/api/products/", port);
             logger.info("📊 仪表盘: http://localhost:{}/admin/dashboard/", port);
             logger.info("📋 审计日志: http://localhost:{}/api/admin/audit-logs/", port);
-            
+
             // 等待服务器关闭
             tomcat.getServer().await();
-            
+
         } catch (LifecycleException e) {
             logger.error("启动Tomcat服务器失败", e);
             System.exit(1);
