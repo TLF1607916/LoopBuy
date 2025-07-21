@@ -35,8 +35,15 @@ public class JwtUtil {
      * @param userId 用户ID
      * @param username 用户名
      * @return 生成的JWT令牌
+     * @throws IllegalArgumentException 如果用户ID或用户名为空
      */
     public static String generateToken(Long userId, String username) {
+        if (userId == null) {
+            throw new IllegalArgumentException("用户ID不能为空");
+        }
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalArgumentException("用户名不能为空");
+        }
         return generateToken(userId, username, null);
     }
 
@@ -46,11 +53,15 @@ public class JwtUtil {
      * @param userId 用户ID
      * @param username 用户名
      * @param role 角色（可为null）
-     * @return 生成的JWT令牌
+     * @return 生成的JWT令牌，如果参数无效则返回null
      */
     public static String generateToken(Long userId, String username, String role) {
-        if (userId == null || username == null) {
-            logger.error("生成JWT令牌失败: 用户ID或用户名为空");
+        if (userId == null) {
+            logger.error("生成JWT令牌失败: 用户ID为空");
+            return null;
+        }
+        if (username == null || username.trim().isEmpty()) {
+            logger.error("生成JWT令牌失败: 用户名为空");
             return null;
         }
 
@@ -77,7 +88,7 @@ public class JwtUtil {
             return builder.compact();
         } catch (Exception e) {
             logger.error("生成JWT令牌时发生异常: {}", e.getMessage(), e);
-            return null;
+            throw new RuntimeException("生成JWT令牌失败: " + e.getMessage(), e);
         }
     }
     
@@ -129,15 +140,15 @@ public class JwtUtil {
     
     /**
      * 从JWT令牌中获取声明
-     * 
+     *
      * @param token JWT令牌
      * @return 声明对象，如果令牌无效则返回null
      */
     private static Claims getClaimsFromToken(String token) {
-        if (token == null || token.isEmpty()) {
+        if (token == null || token.trim().isEmpty()) {
             return null;
         }
-        
+
         try {
             return Jwts.parserBuilder()
                     .setSigningKey(SECRET_KEY)

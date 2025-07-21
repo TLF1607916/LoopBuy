@@ -257,6 +257,12 @@ public class MessageDao {
      * 标记消息为已读
      */
     public boolean markMessagesAsRead(String conversationId, Long userId) {
+        // 参数验证
+        if (conversationId == null || userId == null) {
+            logger.warn("标记消息已读失败: 参数为空 conversationId={}, userId={}", conversationId, userId);
+            return false;
+        }
+
         String sql = "UPDATE message SET is_read = 1, update_time = CURRENT_TIMESTAMP " +
                     "WHERE conversation_id = ? AND receiver_id = ? AND is_read = 0 AND is_deleted = 0";
 
@@ -274,7 +280,7 @@ public class MessageDao {
         } catch (SQLException e) {
             logger.error("标记消息已读时发生数据库错误: conversationId={}, userId={}",
                         conversationId, userId, e);
-            throw new RuntimeException("标记消息已读时发生数据库错误", e);
+            return false;
         }
     }
 

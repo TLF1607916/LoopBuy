@@ -33,7 +33,7 @@ public class FollowDao {
      * @return 新增关注关系数
      */
     public Long getNewFollowCount(LocalDateTime startTime, LocalDateTime endTime) {
-        String sql = "SELECT COUNT(*) FROM user_follow WHERE is_deleted = 0 AND created_at >= ? AND created_at < ?";
+        String sql = "SELECT COUNT(*) FROM user_follow WHERE is_deleted = 0 AND create_time >= ? AND create_time < ?";
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -64,10 +64,16 @@ public class FollowDao {
      * @return 趋势数据列表，每个元素包含日期和当天新增关注关系数
      */
     public List<Map<String, Object>> getFollowGrowthTrend(int days) {
-        String sql = "SELECT DATE(created_at) as date, COUNT(*) as count " +
+        // 参数验证
+        if (days < 0) {
+            logger.warn("获取关注增长趋势失败: days无效: {}", days);
+            return new ArrayList<>();
+        }
+
+        String sql = "SELECT DATE(create_time) as date, COUNT(*) as count " +
                     "FROM user_follow " +
-                    "WHERE is_deleted = 0 AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) " +
-                    "GROUP BY DATE(created_at) " +
+                    "WHERE is_deleted = 0 AND create_time >= DATE_SUB(NOW(), INTERVAL ? DAY) " +
+                    "GROUP BY DATE(create_time) " +
                     "ORDER BY date";
         
         Connection conn = null;
@@ -102,6 +108,12 @@ public class FollowDao {
      * @return 活跃用户列表
      */
     public List<Map<String, Object>> getMostFollowedUsers(int limit) {
+        // 参数验证
+        if (limit <= 0) {
+            logger.warn("获取最受关注用户失败: limit无效: {}", limit);
+            return new ArrayList<>();
+        }
+
         String sql = "SELECT u.id, u.username, u.nickname, COUNT(f.follower_id) as follower_count " +
                     "FROM system_user u " +
                     "LEFT JOIN user_follow f ON u.id = f.followed_id AND f.is_deleted = 0 " +
@@ -109,7 +121,7 @@ public class FollowDao {
                     "GROUP BY u.id, u.username, u.nickname " +
                     "ORDER BY follower_count DESC " +
                     "LIMIT ?";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;

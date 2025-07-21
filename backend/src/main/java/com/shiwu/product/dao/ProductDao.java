@@ -164,7 +164,7 @@ public class ProductDao {
         result.put("total", total);
         result.put("pageNum", pageNum);
         result.put("pageSize", pageSize);
-        result.put("pages", (total + pageSize - 1) / pageSize);  // 总页数
+        result.put("pages", pageSize > 0 ? (total + pageSize - 1) / pageSize : 0);  // 总页数，防止除零
         
         return result;
     }

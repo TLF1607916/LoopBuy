@@ -34,10 +34,24 @@ public class ReviewDao {
      * @return 创建的评价ID，失败返回null
      */
     public Long createReview(Review review) {
+        // 参数验证
+        if (review == null) {
+            logger.warn("创建评价失败: 评价对象为空");
+            return null;
+        }
+
+        // 详细字段验证
+        if (review.getOrderId() == null || review.getProductId() == null ||
+            review.getUserId() == null || review.getRating() == null) {
+            logger.warn("创建评价失败: 必要字段为空 orderId={}, productId={}, userId={}, rating={}",
+                       review.getOrderId(), review.getProductId(), review.getUserId(), review.getRating());
+            return null;
+        }
+
         String sql = "INSERT INTO review (order_id, product_id, user_id, rating, comment, " +
                     "is_deleted, create_time, update_time) " +
                     "VALUES (?, ?, ?, ?, ?, 0, NOW(), NOW())";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -77,8 +91,14 @@ public class ReviewDao {
      * @return 是否已评价
      */
     public boolean isOrderReviewed(Long orderId) {
+        // 参数验证
+        if (orderId == null) {
+            logger.warn("检查订单评价状态失败: 订单ID为空");
+            return false;
+        }
+
         String sql = "SELECT COUNT(*) FROM review WHERE order_id = ? AND is_deleted = 0";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -108,10 +128,16 @@ public class ReviewDao {
      * @return 评价对象，不存在返回null
      */
     public Review findById(Long reviewId) {
+        // 参数验证
+        if (reviewId == null) {
+            logger.warn("查询评价失败: 评价ID为空");
+            return null;
+        }
+
         String sql = "SELECT id, order_id, product_id, user_id, rating, comment, " +
                     "is_deleted, create_time, update_time " +
                     "FROM review WHERE id = ? AND is_deleted = 0";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -140,6 +166,12 @@ public class ReviewDao {
      * @return 评价列表
      */
     public List<ReviewVO> findReviewsByProductId(Long productId) {
+        // 参数验证
+        if (productId == null) {
+            logger.warn("查询商品评价失败: 商品ID为空");
+            return new ArrayList<>();
+        }
+
         String sql = "SELECT r.id, r.order_id, r.product_id, r.user_id, r.rating, r.comment, r.create_time, " +
                     "u.username, u.nickname, u.avatar_url " +
                     "FROM review r " +
@@ -156,6 +188,12 @@ public class ReviewDao {
      * @return 评价列表
      */
     public List<ReviewVO> findReviewsByUserId(Long userId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("查询用户评价失败: 用户ID为空");
+            return new ArrayList<>();
+        }
+
         String sql = "SELECT r.id, r.order_id, r.product_id, r.user_id, r.rating, r.comment, r.create_time, " +
                     "u.username, u.nickname, u.avatar_url " +
                     "FROM review r " +

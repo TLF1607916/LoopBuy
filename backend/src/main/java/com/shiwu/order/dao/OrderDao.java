@@ -24,11 +24,27 @@ public class OrderDao {
      * @return 创建的订单ID，失败返回null
      */
     public Long createOrder(Order order) {
+        // 参数验证
+        if (order == null) {
+            logger.warn("创建订单失败: 订单对象为空");
+            return null;
+        }
+
+        // 详细字段验证
+        if (order.getBuyerId() == null || order.getSellerId() == null ||
+            order.getProductId() == null || order.getPriceAtPurchase() == null ||
+            order.getStatus() == null) {
+            logger.warn("创建订单失败: 必要字段为空 buyerId={}, sellerId={}, productId={}, price={}, status={}",
+                       order.getBuyerId(), order.getSellerId(), order.getProductId(),
+                       order.getPriceAtPurchase(), order.getStatus());
+            return null;
+        }
+
         String sql = "INSERT INTO trade_order (buyer_id, seller_id, product_id, price_at_purchase, " +
                     "product_title_snapshot, product_description_snapshot, product_image_urls_snapshot, " +
                     "status, is_deleted, create_time, update_time) " +
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -71,11 +87,21 @@ public class OrderDao {
      * @return 订单对象，不存在返回null
      */
     public Order findById(Long orderId) {
+        // 参数验证
+        if (orderId == null) {
+            logger.warn("查询订单失败: 订单ID为空");
+            return null;
+        }
+        if (orderId <= 0) {
+            logger.warn("查询订单失败: 订单ID无效: {}", orderId);
+            return null;
+        }
+
         String sql = "SELECT id, buyer_id, seller_id, product_id, price_at_purchase, " +
                     "product_title_snapshot, product_description_snapshot, product_image_urls_snapshot, " +
                     "status, is_deleted, create_time, update_time " +
                     "FROM trade_order WHERE id = ? AND is_deleted = 0";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -118,8 +144,22 @@ public class OrderDao {
      * @return 是否更新成功
      */
     public boolean updateOrderStatus(Long orderId, Integer status) {
+        // 参数验证
+        if (orderId == null) {
+            logger.warn("更新订单状态失败: 订单ID为空");
+            return false;
+        }
+        if (status == null) {
+            logger.warn("更新订单状态失败: 状态为空");
+            return false;
+        }
+        if (orderId <= 0) {
+            logger.warn("更新订单状态失败: 订单ID无效: {}", orderId);
+            return false;
+        }
+
         String sql = "UPDATE trade_order SET status = ?, update_time = NOW() WHERE id = ? AND is_deleted = 0";
-        
+
         Connection conn = null;
         PreparedStatement pstmt = null;
 
@@ -190,6 +230,16 @@ public class OrderDao {
      * @return 订单VO列表
      */
     private List<OrderVO> executeOrderQuery(String sql, Long userId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("查询订单失败: 用户ID为空");
+            return new ArrayList<>();
+        }
+        if (userId <= 0) {
+            logger.warn("查询订单失败: 用户ID无效: {}", userId);
+            return new ArrayList<>();
+        }
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;

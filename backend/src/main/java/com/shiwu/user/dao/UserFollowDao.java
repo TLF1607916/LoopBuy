@@ -31,6 +31,11 @@ public class UserFollowDao {
             return false;
         }
 
+        // 自己不能关注自己
+        if (followerId.equals(followedId)) {
+            return false;
+        }
+
         String sql = "SELECT COUNT(*) FROM user_follow WHERE follower_id = ? AND followed_id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -72,6 +77,18 @@ public class UserFollowDao {
      * @return true if successful, false otherwise
      */
     public boolean followUser(Long followerId, Long followedId) {
+        // 参数验证
+        if (followerId == null || followedId == null) {
+            logger.warn("关注用户失败: 参数为空 followerId={}, followedId={}", followerId, followedId);
+            return false;
+        }
+
+        // 不能关注自己
+        if (followerId.equals(followedId)) {
+            logger.warn("关注用户失败: 不能关注自己 followerId={}, followedId={}", followerId, followedId);
+            return false;
+        }
+
         // 先检查是否已经关注
         if (isFollowing(followerId, followedId)) {
             logger.warn("用户已经关注了目标用户: followerId={}, followedId={}", followerId, followedId);
@@ -115,6 +132,18 @@ public class UserFollowDao {
      * @return true if successful, false otherwise
      */
     public boolean unfollowUser(Long followerId, Long followedId) {
+        // 参数验证
+        if (followerId == null || followedId == null) {
+            logger.warn("取关用户失败: 参数为空 followerId={}, followedId={}", followerId, followedId);
+            return false;
+        }
+
+        // 不能取关自己
+        if (followerId.equals(followedId)) {
+            logger.warn("取关用户失败: 不能取关自己 followerId={}, followedId={}", followerId, followedId);
+            return false;
+        }
+
         logger.info("开始取关操作: followerId={}, followedId={}", followerId, followedId);
 
         // 先检查是否已经关注
@@ -215,6 +244,12 @@ public class UserFollowDao {
      * @return 关注的人数
      */
     public int getFollowingCount(Long userId) {
+        // 参数验证
+        if (userId == null) {
+            logger.warn("获取关注数量失败: 用户ID为空");
+            return 0;
+        }
+
         String sql = "SELECT COUNT(*) FROM user_follow WHERE follower_id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;
@@ -246,6 +281,12 @@ public class UserFollowDao {
      * @return 关注记录，如果不存在则返回null
      */
     public UserFollow findByFollowerAndFollowed(Long followerId, Long followedId) {
+        // 参数验证
+        if (followerId == null || followedId == null) {
+            logger.warn("查询关注记录失败: 参数为空 followerId={}, followedId={}", followerId, followedId);
+            return null;
+        }
+
         String sql = "SELECT id, follower_id, followed_id, create_time, update_time, is_deleted FROM user_follow WHERE follower_id = ? AND followed_id = ? AND is_deleted = 0";
         Connection conn = null;
         PreparedStatement pstmt = null;

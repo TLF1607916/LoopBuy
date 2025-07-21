@@ -28,6 +28,7 @@ public abstract class TestBase {
     protected static final String TEST_USERNAME_2 = "bob";
     protected static final String TEST_USERNAME_3 = "charlie";
     protected static final String TEST_PASSWORD = "123456";
+    // 使用BCrypt轮数10为密码"123456"生成的哈希值 - 这个哈希值是动态生成的，所以测试中会重新生成
     protected static final String TEST_PASSWORD_HASH = "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iYqiSfFVMLVZqpjn/6M.ltU6Td9e";
 
     // 测试管理员数据
@@ -178,15 +179,72 @@ public abstract class TestBase {
      * 插入测试管理员数据
      */
     private static void insertTestAdmins(Connection conn) throws SQLException {
-        String sql = "INSERT INTO administrator (id, username, password, email, role, status, create_time) VALUES (?, ?, ?, ?, ?, ?, NOW())";
+        String sql = "INSERT IGNORE INTO administrator (id, username, password, email, role, status, create_time) VALUES (?, ?, ?, ?, ?, ?, NOW())";
 
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            // 管理员1: admin
             pstmt.setLong(1, TEST_ADMIN_ID);
             pstmt.setString(2, TEST_ADMIN_USERNAME);
             pstmt.setString(3, TEST_PASSWORD_HASH);
             pstmt.setString(4, "admin@test.com");
             pstmt.setString(5, "SUPER_ADMIN");
             pstmt.setInt(6, 1); // 正常状态
+            pstmt.executeUpdate();
+
+            // 管理员2: moderator (用于测试)
+            pstmt.setLong(1, 2L);
+            pstmt.setString(2, "moderator");
+            pstmt.setString(3, TEST_PASSWORD_HASH);
+            pstmt.setString(4, "moderator@test.com");
+            pstmt.setString(5, "MODERATOR");
+            pstmt.setInt(6, 1); // 正常状态
+            pstmt.executeUpdate();
+        }
+    }
+
+    /**
+     * 插入测试订单数据
+     */
+    private static void insertTestOrders(Connection conn) throws SQLException {
+        String sql = "INSERT IGNORE INTO trade_order (id, buyer_id, seller_id, product_id, price_at_purchase, " +
+                    "product_title_snapshot, product_description_snapshot, product_image_urls_snapshot, " +
+                    "status, create_time, update_time, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0)";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            // 订单1: 待付款
+            pstmt.setLong(1, 1001L);
+            pstmt.setLong(2, TEST_USER_ID_1); // 买家
+            pstmt.setLong(3, TEST_USER_ID_2); // 卖家
+            pstmt.setLong(4, 101L); // 商品ID
+            pstmt.setBigDecimal(5, new java.math.BigDecimal("199.99"));
+            pstmt.setString(6, "测试商品标题");
+            pstmt.setString(7, "测试商品描述");
+            pstmt.setString(8, "[\"image1.jpg\",\"image2.jpg\"]");
+            pstmt.setInt(9, 0); // 待付款
+            pstmt.executeUpdate();
+
+            // 订单2: 待发货
+            pstmt.setLong(1, 1002L);
+            pstmt.setLong(2, TEST_USER_ID_1); // 买家
+            pstmt.setLong(3, TEST_USER_ID_3); // 卖家
+            pstmt.setLong(4, 102L); // 商品ID
+            pstmt.setBigDecimal(5, new java.math.BigDecimal("299.99"));
+            pstmt.setString(6, "测试商品标题2");
+            pstmt.setString(7, "测试商品描述2");
+            pstmt.setString(8, "[\"image3.jpg\",\"image4.jpg\"]");
+            pstmt.setInt(9, 1); // 待发货
+            pstmt.executeUpdate();
+
+            // 订单3: 已发货
+            pstmt.setLong(1, 1003L);
+            pstmt.setLong(2, TEST_USER_ID_2); // 买家
+            pstmt.setLong(3, TEST_USER_ID_3); // 卖家
+            pstmt.setLong(4, 103L); // 商品ID
+            pstmt.setBigDecimal(5, new java.math.BigDecimal("399.99"));
+            pstmt.setString(6, "测试商品标题3");
+            pstmt.setString(7, "测试商品描述3");
+            pstmt.setString(8, "[\"image5.jpg\",\"image6.jpg\"]");
+            pstmt.setInt(9, 2); // 已发货
             pstmt.executeUpdate();
         }
     }

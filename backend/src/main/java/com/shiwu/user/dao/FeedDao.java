@@ -34,10 +34,24 @@ public class FeedDao {
      */
     public List<FeedItemVO> getFollowingFeed(Long userId, String type, int offset, int limit) {
         List<FeedItemVO> feeds = new ArrayList<>();
-        
+
         if (userId == null) {
             logger.warn("获取关注动态失败: 用户ID为空");
             return feeds;
+        }
+
+        // 参数验证
+        if (userId <= 0) {
+            logger.warn("获取关注动态失败: 用户ID无效: {}", userId);
+            return feeds;
+        }
+        if (offset < 0) {
+            logger.warn("获取关注动态失败: offset无效: {}", offset);
+            offset = 0;
+        }
+        if (limit <= 0) {
+            logger.warn("获取关注动态失败: limit无效: {}", limit);
+            limit = 10;
         }
         
         StringBuilder sql = new StringBuilder();
@@ -106,6 +120,12 @@ public class FeedDao {
     public long getFollowingFeedCount(Long userId, String type) {
         if (userId == null) {
             logger.warn("获取关注动态数量失败: 用户ID为空");
+            return 0;
+        }
+
+        // 参数验证
+        if (userId <= 0) {
+            logger.warn("获取关注动态数量失败: 用户ID无效: {}", userId);
             return 0;
         }
         

@@ -3,6 +3,7 @@ package com.shiwu.admin.dao;
 import com.shiwu.admin.dto.AuditLogQueryDTO;
 import com.shiwu.admin.model.AuditLog;
 import com.shiwu.common.test.TestConfig;
+import com.shiwu.test.TestBase;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -23,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("AuditLogDao完整测试套件")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Execution(ExecutionMode.CONCURRENT)
-public class AuditLogDaoComprehensiveTest {
+public class AuditLogDaoComprehensiveTest extends TestBase {
 
     private AuditLogDao auditLogDao;
     private static final int PERFORMANCE_TEST_ITERATIONS = 20;
@@ -31,6 +32,7 @@ public class AuditLogDaoComprehensiveTest {
 
     @BeforeEach
     public void setUp() {
+        super.setUp(); // 调用父类的setUp方法
         auditLogDao = new AuditLogDao();
     }
 
@@ -59,23 +61,18 @@ public class AuditLogDaoComprehensiveTest {
 
         // 测试完整的AuditLog对象
         AuditLog completeLog = new AuditLog();
-        completeLog.setAdminId(TestConfig.TEST_USER_ID);
+        completeLog.setAdminId(TestBase.TEST_ADMIN_ID); // 使用TestBase中的有效管理员ID
         completeLog.setAction("TEST_ACTION");
         completeLog.setTargetType("TEST");
-        completeLog.setTargetId(TestConfig.TEST_PRODUCT_ID);
+        completeLog.setTargetId(TestBase.TEST_PRODUCT_ID_1); // 使用TestBase中的有效商品ID
         completeLog.setDetails("测试审计日志");
         completeLog.setIpAddress("192.168.1.100");
         completeLog.setUserAgent("Test User Agent");
         completeLog.setResult(1);
-        
-        try {
-            Long result3 = auditLogDao.createAuditLog(completeLog);
-            // 不管成功与否，都不应该抛出异常
-            assertNotNull(auditLogDao, "创建审计日志后DAO应该正常工作");
-        } catch (Exception e) {
-            // 外键约束异常是可接受的
-            assertNotNull(e, "外键约束异常是可接受的");
-        }
+
+        Long result3 = auditLogDao.createAuditLog(completeLog);
+        assertNotNull(result3, "创建审计日志应该成功");
+        assertTrue(result3 > 0, "审计日志ID应该大于0");
     }
 
     @Test
@@ -87,21 +84,14 @@ public class AuditLogDaoComprehensiveTest {
         assertNull(result1, "null管理员ID应该返回null");
 
         // 测试正常参数
-        try {
-            Long result2 = auditLogDao.logAdminLogin(TestConfig.TEST_USER_ID, "192.168.1.1", "Test Agent", true, "登录成功");
-            // 不管成功与否，都不应该抛出异常
-            assertNotNull(auditLogDao, "记录登录日志后DAO应该正常工作");
-        } catch (Exception e) {
-            assertNotNull(e, "记录登录日志异常是可接受的");
-        }
+        Long result2 = auditLogDao.logAdminLogin(TestBase.TEST_ADMIN_ID, "192.168.1.1", "Test Agent", true, "登录成功");
+        assertNotNull(result2, "记录登录日志应该成功");
+        assertTrue(result2 > 0, "登录日志ID应该大于0");
 
-        // 测试失败登录
-        try {
-            Long result3 = auditLogDao.logAdminLogin(TestConfig.BOUNDARY_ID_NONEXISTENT, "192.168.1.1", "Test Agent", false, "登录失败");
-            assertNotNull(auditLogDao, "记录失败登录日志后DAO应该正常工作");
-        } catch (Exception e) {
-            assertNotNull(e, "记录失败登录日志异常是可接受的");
-        }
+        // 测试失败登录 - 使用不存在的管理员ID应该返回null而不是抛异常
+        Long result3 = auditLogDao.logAdminLogin(TestConfig.BOUNDARY_ID_NONEXISTENT, "192.168.1.1", "Test Agent", false, "登录失败");
+        // 对于不存在的管理员ID，应该返回null（因为外键约束）
+        assertNull(result3, "不存在的管理员ID应该返回null");
     }
 
     @Test
@@ -305,7 +295,7 @@ public class AuditLogDaoComprehensiveTest {
         for (String injection : sqlInjectionAttempts) {
             // 测试审计日志创建注入
             AuditLog injectionLog = new AuditLog();
-            injectionLog.setAdminId(TestConfig.TEST_USER_ID);
+            injectionLog.setAdminId(TestConfig.TEST_ADMIN_ID); // 使用正确的管理员ID
             injectionLog.setAction(injection);
             injectionLog.setTargetType(injection);
             injectionLog.setTargetId(TestConfig.TEST_PRODUCT_ID);
@@ -313,7 +303,7 @@ public class AuditLogDaoComprehensiveTest {
             injectionLog.setIpAddress("192.168.1.100");
             injectionLog.setUserAgent(injection);
             injectionLog.setResult(1);
-            
+
             try {
                 Long result = auditLogDao.createAuditLog(injectionLog);
                 // 不管成功与否，都不应该导致系统异常

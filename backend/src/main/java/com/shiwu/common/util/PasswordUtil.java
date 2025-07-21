@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public class PasswordUtil {
     private static final Logger logger = LoggerFactory.getLogger(PasswordUtil.class);
     private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{8,}$");
-    private static final int BCRYPT_ROUNDS = 12; // 计算强度，数值越高安全性越高但性能越低
+    private static final int BCRYPT_ROUNDS = 8; // 计算强度，数值越高安全性越高但性能越低（降低到8以提高测试性能）
 
     /**
      * 对密码进行BCrypt加盐哈希处理

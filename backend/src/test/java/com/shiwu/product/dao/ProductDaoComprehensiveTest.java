@@ -5,6 +5,7 @@ import com.shiwu.common.test.TestUtils;
 import com.shiwu.product.model.Product;
 import com.shiwu.product.model.ProductCardVO;
 import com.shiwu.product.model.ProductDetailVO;
+import com.shiwu.test.TestBase;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -35,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("ProductDao完整测试套件")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Execution(ExecutionMode.CONCURRENT)
-public class ProductDaoComprehensiveTest {
+public class ProductDaoComprehensiveTest extends TestBase {
 
     private ProductDao productDao;
     private static final int PERFORMANCE_TEST_ITERATIONS = 100;
@@ -43,6 +44,7 @@ public class ProductDaoComprehensiveTest {
 
     @BeforeEach
     public void setUp() {
+        super.setUp(); // 调用父类的setUp方法
         productDao = new ProductDao();
     }
 
@@ -330,9 +332,10 @@ public class ProductDaoComprehensiveTest {
             
             // 测试商品创建注入
             Product injectionProduct = TestUtils.createTestProduct();
+            injectionProduct.setSellerId(TestBase.TEST_USER_ID_1); // 使用有效的用户ID
             injectionProduct.setTitle(injection);
             injectionProduct.setDescription(injection);
-            
+
             try {
                 Long createResult = productDao.createProduct(injectionProduct);
                 // 不管成功与否，都不应该导致系统异常
