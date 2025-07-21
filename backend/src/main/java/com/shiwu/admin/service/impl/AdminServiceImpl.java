@@ -6,7 +6,7 @@ import com.shiwu.admin.enums.AuditTargetTypeEnum;
 import com.shiwu.admin.model.*;
 import com.shiwu.admin.service.AdminService;
 import com.shiwu.admin.service.AuditLogService;
-import com.shiwu.admin.service.impl.AuditLogServiceImpl;
+//import com.shiwu.admin.service.impl.AuditLogServiceImpl;
 import com.shiwu.common.util.JwtUtil;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;

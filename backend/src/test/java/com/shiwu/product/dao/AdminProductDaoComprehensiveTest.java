@@ -1,7 +1,7 @@
 package com.shiwu.product.dao;
 
 import com.shiwu.admin.model.AdminProductQueryDTO;
-import com.shiwu.common.test.TestConfig;
+//import com.shiwu.common.test.TestConfig;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

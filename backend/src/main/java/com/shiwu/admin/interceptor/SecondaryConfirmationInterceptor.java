@@ -6,7 +6,7 @@ import com.shiwu.admin.model.HighRiskOperation;
 import com.shiwu.admin.service.AdminService;
 import com.shiwu.admin.service.impl.AdminServiceImpl;
 import com.shiwu.common.result.Result;
-import com.shiwu.common.util.JwtUtil;
+//import com.shiwu.common.util.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

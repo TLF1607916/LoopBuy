@@ -1,6 +1,6 @@
 package com.shiwu.product.dao;
 
-import com.shiwu.common.test.TestConfig;
+//import com.shiwu.common.test.TestConfig;
 import com.shiwu.product.model.Category;
 import com.shiwu.product.model.CategoryVO;
 import org.junit.jupiter.api.*;
