@@ -380,6 +380,7 @@ public class ProductController extends HttpServlet {
             }
             
             // 解析JSON请求
+            @SuppressWarnings("unchecked")
             Map<String, Object> requestMap = JsonUtil.fromJson(requestBody.toString(), Map.class);
             if (requestMap == null || !requestMap.containsKey("status")) {
                 sendErrorResponse(resp, "400", "无效的请求格式，缺少status字段");

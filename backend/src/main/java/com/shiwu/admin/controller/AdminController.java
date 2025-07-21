@@ -83,6 +83,7 @@ public class AdminController extends HttpServlet {
             }
 
             // 解析JSON请求
+            @SuppressWarnings("unchecked")
             Map<String, Object> requestMap = objectMapper.readValue(requestBody.toString(), Map.class);
             String username = (String) requestMap.get("username");
             String password = (String) requestMap.get("password");
@@ -144,6 +145,7 @@ public class AdminController extends HttpServlet {
             }
 
             // 解析JSON请求
+            @SuppressWarnings("unchecked")
             Map<String, Object> requestMap = objectMapper.readValue(requestBody.toString(), Map.class);
             String password = (String) requestMap.get("password");
             String operationCode = (String) requestMap.get("operationCode");
