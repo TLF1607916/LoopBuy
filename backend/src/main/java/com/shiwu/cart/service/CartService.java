@@ -2,7 +2,7 @@ package com.shiwu.cart.service;
 
 import com.shiwu.cart.model.CartAddDTO;
 import com.shiwu.cart.model.CartOperationResult;
-import com.shiwu.cart.model.CartVO;
+//import com.shiwu.cart.model.CartVO;
 
 import java.util.List;
 

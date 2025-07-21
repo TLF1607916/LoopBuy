@@ -1,8 +1,8 @@
 package com.shiwu.user.dao;
 
-import com.shiwu.user.dao.UserFollowDao;
+//import com.shiwu.user.dao.UserFollowDao;
 import com.shiwu.common.test.TestConfig;
-import com.shiwu.common.test.TestUtils;
+//import com.shiwu.common.test.TestUtils;
 import com.shiwu.test.TestBase;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;

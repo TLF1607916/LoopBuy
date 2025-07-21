@@ -3,7 +3,7 @@ package com.shiwu.admin.service;
 import com.shiwu.admin.dto.AuditLogQueryDTO;
 import com.shiwu.admin.enums.AuditActionEnum;
 import com.shiwu.admin.enums.AuditTargetTypeEnum;
-import com.shiwu.admin.model.AuditLog;
+//import com.shiwu.admin.model.AuditLog;
 import com.shiwu.admin.vo.AuditLogVO;
 
 import java.util.List;

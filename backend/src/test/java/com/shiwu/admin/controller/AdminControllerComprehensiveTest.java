@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.shiwu.admin.model.*;
 import com.shiwu.admin.service.AdminService;
-import com.shiwu.common.result.Result;
+//import com.shiwu.common.result.Result;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+//import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**

@@ -4,13 +4,13 @@ import com.shiwu.common.test.TestConfig;
 import com.shiwu.common.test.TestUtils;
 import com.shiwu.product.model.Product;
 import com.shiwu.product.model.ProductCardVO;
-import com.shiwu.product.model.ProductDetailVO;
+//import com.shiwu.product.model.ProductDetailVO;
 import com.shiwu.test.TestBase;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
-import java.math.BigDecimal;
+//import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
