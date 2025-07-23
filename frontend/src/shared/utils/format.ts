@@ -25,16 +25,37 @@ export const formatPercentage = (value: number, decimals: number = 1): string =>
 };
 
 // 格式化日期
-export const formatDate = (date: string | Date, format: string = 'YYYY-MM-DD'): string => {
-  const d = new Date(date);
-  
+export const formatDate = (date: string | Date | number[] | null | undefined, format: string = 'YYYY-MM-DD'): string => {
+  if (!date) return '-';
+
+  let d: Date;
+
+  // 处理不同的输入格式
+  if (Array.isArray(date)) {
+    // 处理后端返回的数组格式 [2025, 7, 22, 10, 30, 0]
+    const [year, month, day, hour = 0, minute = 0, second = 0] = date;
+    d = new Date(year, month - 1, day, hour, minute, second); // 月份需要减1
+  } else if (typeof date === 'string') {
+    // 处理ISO-8601字符串格式
+    d = new Date(date);
+  } else if (date instanceof Date) {
+    d = date;
+  } else {
+    return '-';
+  }
+
+  // 检查日期是否有效
+  if (isNaN(d.getTime())) {
+    return '-';
+  }
+
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   const hours = String(d.getHours()).padStart(2, '0');
   const minutes = String(d.getMinutes()).padStart(2, '0');
   const seconds = String(d.getSeconds()).padStart(2, '0');
-  
+
   return format
     .replace('YYYY', String(year))
     .replace('MM', month)
@@ -45,22 +66,46 @@ export const formatDate = (date: string | Date, format: string = 'YYYY-MM-DD'): 
 };
 
 // 格式化相对时间
-export const formatRelativeTime = (date: string | Date): string => {
+export const formatRelativeTime = (date: string | Date | number[] | null | undefined): string => {
+  if (!date) return '-';
+
+  let target: Date;
+
+  // 处理不同的输入格式
+  if (Array.isArray(date)) {
+    // 处理后端返回的数组格式 [2025, 7, 22, 10, 30, 0]
+    const [year, month, day, hour = 0, minute = 0, second = 0] = date;
+    target = new Date(year, month - 1, day, hour, minute, second); // 月份需要减1
+  } else if (typeof date === 'string') {
+    // 处理ISO-8601字符串格式
+    target = new Date(date);
+  } else if (date instanceof Date) {
+    target = date;
+  } else {
+    return '-';
+  }
+
+  // 检查日期是否有效
+  if (isNaN(target.getTime())) {
+    return '-';
+  }
+
   const now = new Date();
-  const target = new Date(date);
   const diff = now.getTime() - target.getTime();
-  
+
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
-  
+
   if (days > 0) {
     return `${days}天前`;
   } else if (hours > 0) {
     return `${hours}小时前`;
   } else if (minutes > 0) {
     return `${minutes}分钟前`;
+  } else if (seconds > 0) {
+    return `${seconds}秒前`;
   } else {
     return '刚刚';
   }

@@ -2,6 +2,7 @@ package com.shiwu.common.util;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,8 @@ public class JsonUtil {
         objectMapper = new ObjectMapper();
         // 添加Java 8时间模块支持
         objectMapper.registerModule(new JavaTimeModule());
+        // 禁用时间戳序列化，使用ISO-8601字符串格式
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     /**

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时间格式化测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-case {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #1890ff;
+        }
+        .test-title {
+            font-weight: bold;
+            color: #1890ff;
+            margin-bottom: 10px;
+        }
+        .test-input {
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 5px 0;
+        }
+        .test-output {
+            background: #e6f7ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .success {
+            color: #52c41a;
+        }
+        .error {
+            color: #f5222d;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕐 时间格式化测试页面</h1>
+    <p>测试不同格式的时间数据处理</p>
+
+    <div id="test-results"></div>
+
+    <script>
+        // 模拟前端的时间格式化函数
+        function formatDate(date, format = 'YYYY-MM-DD') {
+            if (!date) return '-';
+            
+            let d;
+            
+            // 处理不同的输入格式
+            if (Array.isArray(date)) {
+                // 处理后端返回的数组格式 [2025, 7, 22, 10, 30, 0]
+                const [year, month, day, hour = 0, minute = 0, second = 0] = date;
+                d = new Date(year, month - 1, day, hour, minute, second); // 月份需要减1
+            } else if (typeof date === 'string') {
+                // 处理ISO-8601字符串格式
+                d = new Date(date);
+            } else if (date instanceof Date) {
+                d = date;
+            } else {
+                return '-';
+            }
+            
+            // 检查日期是否有效
+            if (isNaN(d.getTime())) {
+                return '-';
+            }
+            
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            const seconds = String(d.getSeconds()).padStart(2, '0');
+            
+            return format
+                .replace('YYYY', String(year))
+                .replace('MM', month)
+                .replace('DD', day)
+                .replace('HH', hours)
+                .replace('mm', minutes)
+                .replace('ss', seconds);
+        }
+
+        function formatRelativeTime(date) {
+            if (!date) return '-';
+            
+            let target;
+            
+            // 处理不同的输入格式
+            if (Array.isArray(date)) {
+                const [year, month, day, hour = 0, minute = 0, second = 0] = date;
+                target = new Date(year, month - 1, day, hour, minute, second);
+            } else if (typeof date === 'string') {
+                target = new Date(date);
+            } else if (date instanceof Date) {
+                target = date;
+            } else {
+                return '-';
+            }
+            
+            if (isNaN(target.getTime())) {
+                return '-';
+            }
+            
+            const now = new Date();
+            const diff = now.getTime() - target.getTime();
+            
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            if (days > 0) {
+                return `${days}天前`;
+            } else if (hours > 0) {
+                return `${hours}小时前`;
+            } else if (minutes > 0) {
+                return `${minutes}分钟前`;
+            } else if (seconds > 0) {
+                return `${seconds}秒前`;
+            } else {
+                return '刚刚';
+            }
+        }
+
+        // 测试用例
+        const testCases = [
+            {
+                title: '数组格式时间（旧格式）',
+                input: [2025, 7, 22, 14, 30, 45],
+                description: '后端LocalDateTime序列化为数组格式'
+            },
+            {
+                title: 'ISO-8601字符串格式（新格式）',
+                input: '2025-07-22T14:30:45',
+                description: '后端LocalDateTime序列化为ISO字符串格式'
+            },
+            {
+                title: '完整ISO-8601格式',
+                input: '2025-07-22T14:30:45.123Z',
+                description: '包含毫秒和时区的完整格式'
+            },
+            {
+                title: 'Date对象',
+                input: new Date(2025, 6, 22, 14, 30, 45), // 月份从0开始
+                description: 'JavaScript Date对象'
+            },
+            {
+                title: '空值测试',
+                input: null,
+                description: '空值处理'
+            },
+            {
+                title: '未定义值测试',
+                input: undefined,
+                description: '未定义值处理'
+            },
+            {
+                title: '无效字符串',
+                input: 'invalid-date',
+                description: '无效的日期字符串'
+            }
+        ];
+
+        // 运行测试
+        function runTests() {
+            const resultsContainer = document.getElementById('test-results');
+            
+            testCases.forEach((testCase, index) => {
+                const testDiv = document.createElement('div');
+                testDiv.className = 'test-case';
+                
+                try {
+                    const formatted = formatDate(testCase.input, 'YYYY-MM-DD HH:mm:ss');
+                    const relative = formatRelativeTime(testCase.input);
+                    
+                    testDiv.innerHTML = `
+                        <div class="test-title">测试 ${index + 1}: ${testCase.title}</div>
+                        <div class="test-input">输入: ${JSON.stringify(testCase.input)}</div>
+                        <div class="test-input">描述: ${testCase.description}</div>
+                        <div class="test-output">格式化结果: <span class="success">${formatted}</span></div>
+                        <div class="test-output">相对时间: <span class="success">${relative}</span></div>
+                    `;
+                } catch (error) {
+                    testDiv.innerHTML = `
+                        <div class="test-title">测试 ${index + 1}: ${testCase.title}</div>
+                        <div class="test-input">输入: ${JSON.stringify(testCase.input)}</div>
+                        <div class="test-input">描述: ${testCase.description}</div>
+                        <div class="test-output">错误: <span class="error">${error.message}</span></div>
+                    `;
+                }
+                
+                resultsContainer.appendChild(testDiv);
+            });
+        }
+
+        // 页面加载完成后运行测试
+        document.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>

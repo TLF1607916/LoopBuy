@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { User, UserStatus } from '../types/user-management';
 import { userManagementApi } from '../services/userManagementApi';
+import { formatDate } from '../../../shared/utils/format';
 
 interface UserDetailModalProps {
   visible: boolean;
@@ -61,21 +62,13 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({
     }
   };
 
-  // 格式化时间
-  const formatDateTime = (dateTime: string | number[] | null) => {
+  // 格式化时间 - 使用统一的格式化函数
+  const formatDateTime = (dateTime: string | number[] | null | undefined) => {
     if (!dateTime) return '无';
-    
-    if (Array.isArray(dateTime)) {
-      // 处理后端返回的数组格式 [2025, 7, 22, 10, 30, 0]
-      const [year, month, day, hour = 0, minute = 0, second = 0] = dateTime;
-      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
-    }
-    
-    if (typeof dateTime === 'string') {
-      return new Date(dateTime).toLocaleString('zh-CN');
-    }
-    
-    return '无';
+
+    // 使用统一的formatDate函数，显示完整的日期时间
+    const formatted = formatDate(dateTime, 'YYYY-MM-DD HH:mm:ss');
+    return formatted === '-' ? '无' : formatted;
   };
 
   if (!visible) return null;
